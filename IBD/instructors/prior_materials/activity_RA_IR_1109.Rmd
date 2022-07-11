@@ -1,0 +1,891 @@
+---
+title: "Training Course Exercise: Day 2"
+output: 
+  html_document: 
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(stringr)
+library(polysat)
+library(tidyverse)
+library(usedist)
+library(kableExtra)
+library(devtools)
+#library(ComplexHeatmap)
+library(reshape2)
+library(ggpubr)
+library(rstan)
+library(dplyr)
+library(bayesplot)
+library(simstudy)
+library(lubridate)
+library(patchwork)
+f<-function(x) {
+  r <- quantile(x, probs = c(0.025, 0.25, 0.5, 0.75, 0.975))
+  names(r) <- c("ymin", "lower", "middle", "upper", "ymax")
+  r
+}
+```
+
+# Measuring Malaria Transmission Intensity in Namibia
+
+In this activity, we will perform an analysis of data from a malaria study in Namibia to examine how parasite genetic information can be used to make inferences about malaria transmission. in a particular region. The exercise will demonstrate how various measures of within, and between host parasite genetic diversity, population genetic differentiation, and genetic relatedness are associated with certain aspects of malaria transmission. Through these associations, we will demonstrate how certain analyses of parasite genetic data can provide information that is useful for malaria surveillance, and targeting interventions. Specifically, the activity will cover the computation and implementation of the following metrics: 
+
+* Multiplicity of infection (MOI)
+* Heterozygosity $(H_E)$
+* Within host fixation index $(F_{WS})$
+* Identity by State (IBS)
+* Fixation index $(F_{ST})$
+* Jost's D
+
+The learning objectives of this activity are: 
+
+* To familiarize the participant with parasite genetic data 
+* To understand various measures of genetic diversity and relatedness within individuals and populations
+* To understand how these measures are associated with two aspects of malaria transmission: transmission intensity, and connectivity
+* To understand how these measures can inform malaria surveillance, or help target interventions
+
+
+## Study Background
+The data we present were published by Tessema et al. (2019) in the journal Elife. Briefly, a combination of dried blood spots and Rapid Diagnostic Tests were collected from $2585$ symptomatic malaria patients at $29$ health facilities in four health facility districts in northeastern Namibia - Rundu, Nyangana, Andara, and Zambezi. These samples were genotyped using $26$ microsatellite markers. 
+
+_**Definition:** A microsatellite is a tract of repetitive DNA motifs that typically range from one to six base pairs that is repeated multiple (5 - 50) times._
+
+```{r background, echo=FALSE, fig.height = 3}
+load("hf_locs_plot_data.RData")
+
+pt_size <- 1.5
+pt_alpha <- 1
+p_region <- ggplot() + 
+  geom_polygon(data=shp_outline_df, aes(x=long, y=lat, group=id), fill="grey97", col="black") + 
+  geom_point(data=hf_df, aes(x=long, y=lat, col=region), size=pt_size, alpha=pt_alpha) + 
+  coord_fixed() + 
+  theme_minimal() + 
+  scale_color_manual("Region", values=admin_colours) + 
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank()) + 
+  ggtitle("Health facility locations") + 
+  NULL
+print(p_region)
+
+```
+
+
+Transmission of malaria in Namibia is generally low compared to many other areas of sub-Saharan Africa, with efforts to reduce transmission over the last decade being largely successful, although progress has slowed in recent years. 
+
+![](prev_plot_all2.png)
+
+The map above shows estimated malaria prevalence from the Malaria Atlas Project in Namibia in 2018. Namibia has relatively low prevalence rates compared to neighboring countries, suggesting lower malaria transmission (though incidence and prevalence are not direct measures of transmission).
+
+![](study_area_inc.png)
+
+
+Malaria Atlas Project estimates of malaria incidence within the study area (shown above) suggest that incidence is lowest in Zambezi. However, the spatial resolution of these estimates is too coarse to reveal any differences in incidence between the remaining health facility districts (Rundu, Andara, and Nyangana).
+
+We know from other estimates of incidence and prevalence collected at health centers in these four regions that Rundu and Andara districts had higher malaria incidence and higher proportions of imported malaria cases during this time period than Nyangana and Zambezi. 
+
+**Therefore, for the remainder of this activity we will assume that Rundu and Andara have higher levels of transmission than Nyangana and Zambezi, with Zambezi being the lowest transmission region.**.  
+
+
+
+
+
+## What Do Genetic Data Look Like? 
+To begin, we will examine the parasite genetic data in its raw form in order to gain familiarity with the data and how it is displayed. The genetic data collected in the study can be represented by a matrix (or table). Each sample from an individiual ($n=2585$) is a row  in our table and each locus or microsatellite in the genome that we genotyped represents a column $(26)$, with one additional column for the sample's unique identification number, or sample ID. 
+
+
+
+Therefore the table for our genetic data has dimensions $2585 \times 27$. Each individual entry in the table of data is a list of which alleles were found in that particular sample for that particular locus. 
+
+_**Definition:** An allele is the identity of a particular genetic locus or sequence that is inherited between parents and offspring._
+
+_**Definition:** A locus is a fixed position on a chromosome where a particular genetic marker is located._
+
+We read in raw data from an excel spreadsheet or other similar format into the statistical computing software R so that we can manipulate the data more easily, and perform statistical analysis. After reading the data into R, we see what the raw data look like. Below, we show $6$ samples (rows) and the first $9$ columns or the first $8$ microastellite loci (labeled as "AS1","AS2","AS3","AS32","AS7", "AS8","AS11", and "AS12") here for convenience. If there is more than one allele at a given locus, the alleles will be separated by a semi-colon (;). 
+
+```{r data, echo=F}
+#read in data
+all_alleles <- read.csv("NamAllAlleles_MSdata.csv")
+meta_data <- read.csv("NamMetadata.csv", stringsAsFactors = FALSE)
+
+kable(head(all_alleles[,c(1:9)])) %>%
+  kable_classic_2()
+colnames(meta_data)[which(colnames(meta_data) == "barcode")]<-"sample_id"
+```
+Looking more closely at sample number $1071879259$ in the second row we see that it has: 
+
+* At locus AS1: no alleles 
+* At locus AS2: 2 alleles called 198 and 192
+* At locus AS3: no alleles
+* At locus AS32: 1 allele called 242 
+* At locus AS7: no alleles
+* At locus AS8: 2 alleles called 201 and 198
+* At locus AS11: no alleles 
+* At locus AS12: 2 alleles called 162 and 165
+
+**Note:** Some samples have no allele at a particular locus (eg. sample number  $1071879259$ has no alleles at locus AS1). This is because the we were unable to obtain data for that particular locus, which can happen for a multitude of reasons.  We often need to perform some degree of quality control or data cleaning for this reason, for example we may elect to remove samples (rows), which have a lot of missing data and/or loci (columns) which have missing data for a large number of the samples. This is a common occurrence in genetic data sets.
+
+_**Definition:** Sequencing data consists of sequences of DNA obtained from a DNA sequencing reaction_
+
+In addition to the genetic data, we also have epidemiological information, or meta data, about each individual including the district where the sample was taken, the identifier for that sample (which is equivalent to the "Sample" column in the genetic data above), and the incidence of malaria  for the area the sample was taken from.  
+We can link the epidemiological information, or meta data, to the genetic data through the sample identifier associated with each sample (which is found in the column "sample_id" in the table). 
+
+```{r data2, echo=FALSE}
+print(head(meta_data[,c('district','sample_id','incidence')]))
+```
+
+
+# Using Genetic Diversity to Characterize Malaria Transmission  
+
+In this section we will examine how parasite genetic diversity within and between hosts is associated with malaria transmission intensity across the four sampled regions of Namibia (Rundu, Nyangana, Andara, and Zambezi). In order to do this we will compute the following: 
+
+* Multiplicity of infection (MOI)
+* Heterozygosity $(H_E)$
+* Within-Host Fixation Index $(F_{WS})$
+* Genetic distance using Identity by State (IBS)
+
+## Measures of Genetic Diversity
+For each sample, using the genotyping data from $26$ microsatellite loci (shown above), multiplicity of infection (MOI), heterozygozity ($H_E$) and within-host fixation index ($F_{ws}$) were calculated. In this section, we will show how to calculate of each of these metrics (with examples), explore how these metrics vary across the four regions of Namibia, and describe what each of these metrics can reveal about malaria transmission. 
+
+### Multiplicity of infection (MOI)
+
+
+***
+_**Definition:** MOI is a measure of the number of different malaria parasite clones in an individual sample._
+
+Ways of calculating MOI: 
+
+1. MOI $=$ maximum number of alleles present at any genotyped locus in a sample. 
+
+2. MOI $=$ the second highest number of alleles present at any genotyped locus in a sample. This is done to address the possibility of false positives in detecting alleles.  
+
+3. MOI can also be statisitically estimated using tools which account for parasites sharing the same allele or that an allele present may not be detected (a false negative), resulting in underestimates, and that a false positive allele may be detected, resulting in over estimates. Software exists for calculating this from binary SNP data (THE REAL McCOIL, Chang et al, 2017) and from multi-allelic loci such as microsatellites and microhaplotypes (MOIRE, https://m-murphy.github.io/moire/ - currently unpublished).
+
+    + _**Definition:** False positive detection of alleles occurs when genetic data within two samples at a particular locus (in this case microsatellite) appear to be different and are assigned as different alleles, however, the difference is not real and is due to an error._
+    
+     + _**Definition:** False negative detection of alleles occurs when genetic data within two samples at a particular locus (in this case microsatellite) appear to be the same and are assigned as the same alleles, however in reality they are different ._
+    
+***
+
+**Example Calculation of MOI:** 
+
+Suppose we look at the genetic data for one sample (number $1071878953$): 
+
+```{r, echo=F}
+kable(head(all_alleles[1,]))%>%
+  kable_classic_2()
+```
+
+The maximum number of alleles present at a locus in this sample is $4$ (AS25, containing alleles 123,120,104,and 101), however in order to account for possible false positives we will designate the MOI of this sample to be the next highest number of alleles present at a given locus, $2$ (TA109 which contains alleles 152 and 177, and TA40 which contains alleles 268 and 271). 
+
+We can repeat this procedure across all samples in our data to obtain the following distribution of MOI across the four sampled regions of Namibia: 
+
+
+```{r popdif, echo=FALSE, warning=F}
+
+#for each sample calculate MOI
+n_samples <- dim(all_alleles)[1]
+moi_vec <- rep(NA, n_samples)
+
+for(i in 1:n_samples){
+  sample_row <- all_alleles[i, -1]
+  #alleles are separated by a semicolon, so counting these +1 gives number
+  #of alleles at each loci
+  no_of_alleles <- sapply(sample_row, function(alleles) str_count(alleles, ";")) + 1
+  #MOI is estimated as second highest number of alleles over all loci
+  #allows for possibility of false positive allele calls
+  # moi_vec[i] <- max(sapply(sample_row, function(alleles) str_count(alleles, ";"))) + 1
+  moi_vec[i] <- sort(no_of_alleles, decreasing = TRUE)[2]
+  
+}
+meta_data$moi <- moi_vec[match(meta_data$sample_id, all_alleles$Sample)]
+meta_data$Admin2[meta_data$Admin2 == "Katima"] <- "Zambezi"
+meta_data$Admin2 <- factor(meta_data$Admin2, levels=c("Rundu", "Nyangana", "Andara", "Zambezi"),ordered = TRUE)
+
+meta_data$moi<- as.factor(meta_data$moi)
+moi_hist<- ggplot(meta_data,aes(x=moi))+
+  geom_histogram(stat="count")+
+  theme_linedraw()+
+  xlab("MOI")
+print(moi_hist)
+meta_data$moi<- as.numeric(meta_data$moi)
+```
+
+**Question:** How many samples have monoclonal infections (monoclonal means MOI$=1$)?
+
+**Answer:** _Approximately 600 (use the count on the histogram)._
+
+**Question:** What proportion of samples have $MOI=3$?
+
+**Answer:** _Approximately $20\%$. Calculated by taking the count of samples that have $MOI=3$ which is approximately $500$, and dividing by the total number of samples in our data $2585$. Since $\frac{500}{2585}\times 100 = 19.34\%$, this is approximately $20\%$._
+
+A boxplot is is another way we can visualize the MOI values in this data. 
+
+```{r, echo=F}
+
+moi_overall<- ggplot(meta_data,aes(x=country, y=moi))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(alpha=0.3,size=0.5, height=0.2)+
+  # geom_point(alpha=0.3, size=0.5) + 
+  theme_linedraw()+
+  theme(legend.position = "none") + 
+  ylab("MOI") + xlab(NULL)+theme(axis.ticks.x = element_blank(),
+        axis.text.x = element_blank()) + 
+  scale_y_continuous(breaks=0:10)
+print(moi_overall)
+
+
+```
+
+Important features of the boxplot: 
+
+* The lowest vertical line spans the bottom $25\%$ of samples (MOI between $1$ and $2$). 
+* The lowest black horizontal line (at $MOI=2$) is both the median and the first quartile. 
+    + _**Definition:** The median is the value that separates the lower and upper $50\%$ of the data._
+    + _**Definition:** The first quartile is the value that separates the bottom $25\%$ from the top $75\%$ of the data._ 
+    + **Note:** In this case the first quartile of the data is the same as the median, (both $MOI=2$) this is not the case in all data sets. When the first quartile and the median are different, they will be represented by two different horizontal lines in a boxplot. 
+* The upper black horizontal line (at $MOI=4$) is the third quartile. 
+    + _**Definition:** The third quartile is the value that separates the bottom_ $75\%$ _from the top_ $25\%$ _of the data. _
+*The upper vertical line spans the top $25\%$ of samples (MOI between $4$ and $10$).
+
+Now that we understand the overall distribution of MOI in the sampled regions of Namibia we can consider the relationship between MOI and transmission intensity. 
+
+**Question:** What is the relationship between MOI and transmission intensity?
+
+**Answer:** _Generally, high transmission regions have higher average MOI among samples and low transmission regions have lower average MOI among samples. However, in very low transmission settings where many detected cases are imported, the average MOI may be more of a reflection of diversity in the areas where the imported cases originated than diversity of locally aquired cases._ 
+
+**Question:** Why do you think there is this relationship?
+
+**Answer:** _In high transmission settings, people often get many infectious mosquito bites fairly regularly, in other words they get re-infected with parasites in rapid succession. This, combined with the fact that many people harboring parasites in high transmission settings are asymptomatic (without symptoms), making them unlikely to get treatment for malaria and thus get rid of these parasites, means that people tend to accumulate high numbers of parasites in high transmission settings. There also tends to be a high genetic diversity of parasites in regions with high transmission (which will be discussed further later in this activity), therefore the chance that the parasites a person might accumulate are genetically distinct clones is higher. This means that a person in a high transmission region is likely to have many genetically distinct parasites at one time, giving them a high MOI._ 
+
+
+We can now compare MOIs across the four sampled regions in Namibia and relate MOI to transmission intensity. 
+
+
+**Question**: Using information from the lecture, as well as information about known transmission intensities in the four regions of Namibia that samples were taken from (Rundu, Andara, Nyangana, and Zambezi), assign each boxplot of MOI to a region: \ 
+
+
+
+
+```{r, echo=F}
+#plot MOI by district
+meta_data<- meta_data%>%
+  mutate(District_num=ifelse(Admin2=="Andara","1",ifelse(Admin2=="Nyangana","2",ifelse(Admin2=="Rundu","3","4"))))
+
+meta_data$District_num<- as.factor(meta_data$District_num)
+moi_p <- ggplot(meta_data[!is.na(meta_data$Admin2), ],
+                aes(x=District_num, y=moi)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  # geom_point(aes(x=Admin2, y=moi, col="firebrick"), position=position_dodge2(width=0.3), alpha=0.7)
+  geom_jitter(alpha=0.3, size=0.5, height=0.2) + 
+  theme_linedraw() + 
+  theme(legend.position = "none") + 
+  ylab("MOI") + xlab(NULL) + 
+  scale_y_continuous(breaks=0:10) 
+print(moi_p)
+  
+```
+
+**Answer:** (note that the two higher (Rundu and Andara) and two lower transmission regions (Nyangana and Zambezi) are indistinguishable so what really matters is that the high and low transmission regions are correctly assigned)\ 
+
+
+
+```{r, echo=F}
+#plot MOI by district
+moi_p <- ggplot(meta_data[!is.na(meta_data$Admin2), ],
+                aes(x=district, y=moi, col=district)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  # geom_point(aes(x=Admin2, y=moi, col="firebrick"), position=position_dodge2(width=0.3), alpha=0.7)
+  geom_jitter(alpha=0.3, size=0.5, height=0.2) + 
+  theme_linedraw() + 
+  scale_color_manual(values=c(admin_colours[3],admin_colours[2],
+                              admin_colours[1],admin_colours[4])) + 
+  theme(legend.position = "none") + 
+  ylab("MOI") + xlab(NULL) + 
+    scale_y_continuous(breaks=0:10) 
+print(moi_p)
+  
+```
+
+
+Andara and Rundu, the higher transmission regions, tend to have higher MOI samples than Nyangana and Zambezi, the lower transmission regions. **Generally, MOI values of samples and levels of transmission are positively correlated.** In some cases however, regions with very low levels of endemic transmission but high levels of importation can have samples with high MOI. 
+
+### Heterozygosity
+
+Now we can calculate a population level measure of genetic diversity, which is Heterozygosity. 
+
+***
+_**Definition**: Population Level Heterozygosity or Expected Heterozygosity ($H_E$): is a measure of the genetic diversity of the different clones in a population, at a particular genetic locus._
+
+
+We can calculate expected heterozygosizy or population level heterozygosity of a particular locus with the following equation: 
+
+$$H_E= \left(\frac{n}{n-1}\right) \times \left(1-\sum_{i}p_i^2\right)$$
+where $n$ is the number of genotyped samples in our population of interest, and $p_i$ is the frequency of the $i^{th}$ allele in the population at a particular locus. The value of $H_E$ is between 0 and 1, with values close to 0 representing low genetic diversity and values close to 1 representing high genetic diversity. 
+
+***
+
+**Question:** What relationship would we expect between population-level heterozygosity and transmission intensity?
+
+**Answer:** _We would expect higher population level heterozygosity in high transmission settings._  
+
+We can use this equation to calculate population level heterozygosity ($H_E$) across all four regions of Namibia we sampled from at each locus we genotyped (there are $26$ points on this boxplot, one for each microsatellite locus): 
+
+
+```{r,echo=F}
+barcodes <- all_alleles[, 1]
+districts <- sort(unique(meta_data$district))
+n_dist <- length(districts)
+
+#do He for whole study area
+alleles_all <- all_alleles[, -1]
+n <- dim(alleles_all)[1]
+#calculate He for each marker
+He_marker <- apply(alleles_all, 2, function(col){
+  all <- unlist(str_split(col, ";"))
+  all <- all[all != ""]
+  all_count <- table(all)
+  all_freq <- all_count / length(all)
+  return((n/(n-1)) * (1 - sum(all_freq^2)))
+})
+df <- data.frame(marker=names(He_marker),
+                 He=He_marker,
+                 country="Namibia")
+
+
+p <- ggplot(df, aes(x=country,y=He)) + 
+  geom_boxplot() + 
+  # geom_point() + 
+  geom_jitter(alpha=0.8, size=1) + 
+  theme_linedraw() +  
+  theme(legend.position = "none") + 
+  xlab(NULL) + 
+  ylab("Heterozygosity") + 
+  NULL
+print(p)
+
+```
+
+**Question:** What is the median $H_E$ or population level heterozygosity for our sampled loci ($26$ microsatellite markers)?
+
+**Answer:** _Approximately 0.81 (level of the second highest horizontal line)._
+
+**Question:** What is the first quartile in this distribution of $H_E$? 
+
+**Answer:** _Approximately $0.63$ (level of the lowest horizontal line)._
+
+
+As we did with MOI we can  compare $H_E$ values for each locus across the four sampled regions in Namibia and relate $H_E$ to transmission intensity. 
+
+
+**Question:**Using information from the lecture, as well as information about known transmission intensities in the four regions of Namibia that samples were taken from (Rundu, Andara, Nyangana, and Zambezi), assign each boxplot of $H_E$ to a region:\ 
+
+
+```{r, echo=F}
+df_all <- c()
+for(i in 1:n_dist){
+  district_codes <- meta_data$sample_id[meta_data$district == districts[i]]
+  alleles_dist <- all_alleles[barcodes %in% district_codes, -1]
+  n <- dim(alleles_dist)[1]
+  
+  #calculate He for each marker
+  He_marker <- apply(alleles_dist, 2, function(col){
+    all <- unlist(str_split(col, ";"))
+    all <- all[all != ""]
+    all_count <- table(all)
+    all_freq <- all_count / length(all)
+    return((n/(n-1)) * (1 - sum(all_freq^2)))
+  })
+  
+  df_all <- rbind(df_all,
+    data.frame(marker=names(He_marker),
+               He=He_marker,
+               dist=districts[i])
+  )
+}
+
+df_all$dist <- factor(df_all$dist, 
+                      levels = districts[c(3, 2, 1, 4)],
+                      ordered = TRUE)
+
+df_all<- df_all%>%
+  mutate(dist_number= ifelse(dist=="Rundu East",1,ifelse(dist=="Nyangana District",2,ifelse(dist=="Andara District",3,4))))
+
+p <- ggplot(df_all, aes(x=dist_number, y=He, group=dist)) + 
+  geom_boxplot() + 
+  # geom_point() + 
+  geom_jitter(alpha=0.8, size=1) + 
+  theme_linedraw() +  
+  theme(legend.position = "none") + 
+  xlab(NULL) + 
+  ylab("Heterozygosity") + 
+  NULL
+print(p)
+```
+
+**Answer:**\ 
+
+```{r, echo=F}
+p <- ggplot(df_all, aes(x=dist, y=He, group=dist, col=dist)) + 
+  geom_boxplot() + 
+  # geom_point() + 
+  geom_jitter(alpha=0.8, size=1) + 
+  theme_linedraw() +  
+  scale_colour_manual(values=admin_colours) + 
+  theme(legend.position = "none") + 
+  xlab(NULL) + 
+  ylab("Heterozygosity") + 
+  NULL
+print(p)
+```
+
+Andara, Rundu, and Nyangana have very similar heterozygosity values for the sampled loci, and Zambezi, the lower transmission region has lower heterozygosity values across sampled loci. **Heterozygosity of samples and transmission intensity tends to be positively correlated**
+
+
+
+### Within-host fixation index
+
+Another measure of genetic diversity that relates the genetic diversity of a single host to that of a population is within-host fixation index $(F_{WS})$.
+
+
+***
+_**Definition:**_ $F_{ws}$ _is a measure of the within-host diversity of an individual infection relative to the population level genetic diversity. _
+
+A high $F_{ws}$ indicates low within-host diversity relative to the population. A low $F_{ws}$ indicates a high within-host diversity relative to the population. 
+
+ $F_{ws}$ is calculated using the following equation: 
+ $$F_{ws} =1−H_w/H_s$$
+Where $H_w$ is the heterozygosity of the individual and $H_s$ is the heterozygosity of the local parasite population.
+
+***
+
+High values of $F_{ws}$ suggest low within host diversity relative to the population's diversity. Low values of $F_{ws}$ suggest high within host diversity relative to the population's diversity. It is common to calculate a similar value, $1-F_{ws}$ so that there is a positive 
+relationship between the value and within host diversity: 
+$$1-F_{ws}= 1-\left(1-\frac{H_w}{H_s}\right) = \frac{H_w}{H_s}$$
+
+$1-F_{ws}$ has the opposite relationship to within host diversity relative to the population's diversity. High values of $1-F_{ws}$ suggest high within host diversity relative to the population's diversity. Low values of $1-F_{ws}$ suggest low within host diversity relative to the population's diversity. 
+
+In higher transmission areas, individuals are more likely to be be infected by multiple clones and therefore the within-host diversity of samples from this area is likely to be higher, and so $1-F_{ws}$ is likely to be higher. In contrast, individuals in low transmission regions are more likely to have monoclonal infections or polyclonal infections with lower MOI and therefore within-host diversity is likely to be lower. This metric is closely related to MOI. 
+
+
+```{r, echo= F}
+He_vec <- rep(NA, n_samples)
+
+#calculate admin level heterozygosity
+He_admin <- sapply(districts, function(district) mean(df_all$He[df_all$dist == district]))
+
+for(i in 1:n_samples){
+  sample_row <- all_alleles[i, -1]
+  sample_allele_num <- rep(NA, length(sample_row))
+  loci_with_reads <- sample_row != ""
+  #again calculate the number of alleles at each loci using number of semicolons
+  sample_allele_num[loci_with_reads] <- str_count(sample_row[loci_with_reads], ";") + 1
+  #assuming alleles occur at equal frequency, the sum of squared frequencies of each allele
+  #is summing (1/k^2) k times so simplifies to 1/k. This then averaged over all loci
+  He_vec[i] <- 1 - (sum(1 / sample_allele_num, na.rm=T) / sum(!is.na(sample_allele_num)))
+}
+
+
+meta_data$He <- He_vec[match(meta_data$sample_id, all_alleles$Sample)]
+meta_data$Hs <- He_admin[match(meta_data$district, districts)]
+
+
+meta_data$Fws <- 1 - meta_data$He/meta_data$Hs
+
+```
+
+**Question:** Using information from the lecture, as well as information about known transmission intensities in the four regions of Namibia that samples were taken from (Rundu, Andara, Nyangana, and Zambezi), assign each boxplot of $1-F_{ws}$ to a region:\ 
+
+
+```{r, echo = F}
+meta_data<- meta_data%>%
+  mutate(Admin2=fct_relevel(Admin2,"Nyangana", "Zambezi", "Rundu", "Andara"))%>%
+  mutate(district_numbered= ifelse(Admin2=="Nyangana",1,ifelse(Admin2=="Zambezi",2,ifelse(Admin2=="Rundu",3,4))))
+
+Fws_p <- ggplot(meta_data[!is.na(meta_data$Admin2), ],
+               aes(x=district_numbered, y=1-Fws, group=district_numbered)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  geom_jitter(alpha=0.3, size=0.5) + 
+  theme_linedraw() + 
+  theme(legend.position = "none") + 
+  xlab(NULL)+theme(axis.ticks.x = element_blank(),
+        axis.text.x = element_blank())
+print(Fws_p)
+```
+
+**Answer:** \ 
+
+```{r, echo=F}
+
+
+Fws_p <- ggplot(meta_data[!is.na(meta_data$Admin2), ],
+               aes(x=Admin2, y=1-Fws, col=Admin2)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  geom_jitter(alpha=0.3, size=0.5) + 
+  scale_color_manual(values=c(admin_colours[2],admin_colours[4],admin_colours[1],
+                              admin_colours[3])) + 
+  theme_linedraw() + 
+  theme(legend.position = "none") + 
+  xlab(NULL)
+print(Fws_p)
+```
+
+Andara and Rundu, the higher transmission regions, tend to have samples with higher $1-F_{ws}$ values (lower $F_{ws}$) than Nyangana and Zambezi, the lower transmission regions. Recall, high values of $F_{ws}$ are associated with lower transmission and high values of  $1-F_{ws}$ have the opposite relationship to transmission, they are associated with higher transmission. 
+
+
+
+## Genetic Distance and its Relationship to Transmisison Intensity 
+
+A slightly more indirect way to measure the genetic diversity of a population is to measure how closely related (genetically) pairs of infections are within a population. This measure is also associated with transmission intensity. 
+
+### Identity by State (IBS)
+We can measure the relatedness of two parasites by considering how similar their sequences are. Two sequences that are identical at a given position or marker are said to be identical by state at this location. To summarise relatedness between two samples across the whole genome, we can use an identity by state (IBS) metric.
+
+***
+
+_**Definition:** IBS is the proportion of shared alleles in two samples across all genotyped markers. High values of IBS suggest that parasites from two different samples are highly related._
+
+For monoclonal samples, this can be expressed in equation form: $$IBS= \frac{\mbox{Number of shared alleles in two samples across genotyped markers}}{\mbox{Number of genotyped markers}}$$
+
+For polyclonal samples, IBS at a particular locus can be defined as, for a pair of samples, $X$ and $Y$,  the total number of shared alleles $S_{i}$ across the two samples divided by all alleles at that locus for sample $X$, $X_{i}$ and all alleles at that locus for sample $Y$, $Y_{i}$. This can be summed across all loci to produce an overall estimate of IBS. 
+
+$$IBS=  \frac{1}{n} \sum_{i=1}^{n} \frac{S_{i}} {X_{i}Y_{i}} $$
+**Question:** Use this equation to calculate IBS at a single locus with the following microsatellite data:
+Sample X,  Allele 1 = 198, Allele 2 = 192
+Sample Y, Allele 1 = 195, Allele 2 = 192
+
+**Answer**: _As the samples both have a copy of allele 192, shared alleles, $S_{i}$ is 2. Both  samples $X$ and $Y$ have two alleles at this locus, so $X_{i}$ and $Y_{i}$ are both $2$, multiplied together $X_{i}Y_{i}$ equals 4. As a result IBS at this locus is $\frac{2}{4}$ or  $0.5$._ 
+
+***
+
+
+The proportion of shared alleles is not a perfect measure of relatedness, as two samples may have the same alleles by chance even if they are not related (i.e. they do not have a common ancestor).  Therefore, for pairs of samples with low proportions of shared alleles, this metric might not tell us much about the relative relatedness. For example, a pair of samples with $IBS=0.01$ might not be more related than a pair with $IBS=0.005$.  IBS is also affected by errors in the sequencing process and the MOI of each sample and doesn’t take into account allele frequencies, i.e. infections sharing rare alleles is stronger evidence of them being related than if they share common alleles. Estimates of Identity By Descent (see lecture materials and supplement), while more complicated to calculate, overcome some of these issues
+
+
+To try and reduce this uncertainty, we can classify pairs of samples as "highly related" or "not highly related" if the values of $IBS$ is above a certain threshold. This allows us to ignore small differences and hopefully see more meaningful differences. Here we define a pair of samples as highly related if $IBS>0.6$, although this threshold can be varied.
+
+To measure relatedness between all samples in a population, we can look at the proportion of pairs of samples that are highly related. In a population that is more related we would expect to see a higher proportion of highly related pairs of samples. 
+
+
+```{r, echo=F}
+dist_1<- readRDS("namDmatJaccard.rds")
+dist_2<- readRDS("namDmatDcifer.rds")
+
+
+diag(dist_1)<- NA
+diag(dist_2)<- NA
+#which IDs are from rundu and zambezi
+rundu_barcodes<- meta_data$sample_id[which(meta_data$Admin2=="Rundu")]
+zambezi_barcodes<- meta_data$sample_id[which(meta_data$Admin2=="Zambezi")]
+nyangana_barcodes<- meta_data$sample_id[which(meta_data$Admin2=="Nyangana")]
+andara_barcodes<- meta_data$sample_id[which(meta_data$Admin2=="Andara")]
+
+#IBS relatedness within Zambezi and Rundu (boxplot comparison) 
+
+within_zambezi_index_1<- which(colnames(dist_1)%in%zambezi_barcodes&rownames(dist_1)%in%zambezi_barcodes)
+within_rundu_index_1<- which(colnames(dist_1)%in%rundu_barcodes&rownames(dist_1)%in%rundu_barcodes)
+within_nyangana_index_1<- which(colnames(dist_1)%in%nyangana_barcodes&rownames(dist_1)%in%nyangana_barcodes)
+within_andara_index_1<- which(colnames(dist_1)%in%andara_barcodes&rownames(dist_1)%in%andara_barcodes)
+
+within_rundu_dist_1<-as.vector(dist_1[within_rundu_index_1,within_rundu_index_1])
+within_rundu_dist_1<- within_rundu_dist_1[!is.na(within_rundu_dist_1)]
+
+within_zambezi_dist_1<-as.vector(dist_1[within_zambezi_index_1,within_zambezi_index_1])
+within_zambezi_dist_1<- within_zambezi_dist_1[!is.na(within_zambezi_dist_1)]
+
+within_andara_dist_1<-as.vector(dist_1[within_andara_index_1,within_andara_index_1])
+within_andara_dist_1<- within_andara_dist_1[!is.na(within_andara_dist_1)]
+
+within_nyangana_dist_1<-as.vector(dist_1[within_nyangana_index_1,within_nyangana_index_1])
+within_nyangana_dist_1<- within_nyangana_dist_1[!is.na(within_nyangana_dist_1)]
+
+IBS_dist_within_regions_df<- as.data.frame(cbind(c(within_rundu_dist_1,within_nyangana_dist_1,within_andara_dist_1,within_zambezi_dist_1),
+                    c(rep("Rundu",length(within_rundu_dist_1)),rep("Nyangana", length(within_nyangana_dist_1)),
+                      rep("Andara", length(within_andara_dist_1)),rep("Zambezi", length(within_zambezi_dist_1)))))
+
+colnames(IBS_dist_within_regions_df)<- c("Genetic_Distance","District")
+IBS_dist_within_regions_df$Genetic_Distance<- as.numeric(as.character(IBS_dist_within_regions_df$Genetic_Distance))
+
+prop_highly_related_in_zambezi<- length(which(IBS_dist_within_regions_df$Genetic_Distance>0.6&
+                                                IBS_dist_within_regions_df$District=="Zambezi"))/
+                                  length(which(IBS_dist_within_regions_df$District=="Zambezi"))
+
+prop_highly_related_in_rundu<- length(which(IBS_dist_within_regions_df$Genetic_Distance>0.6&
+                                                IBS_dist_within_regions_df$District=="Rundu"))/
+  length(which(IBS_dist_within_regions_df$District=="Rundu"))
+
+prop_highly_related_in_andara<- length(which(IBS_dist_within_regions_df$Genetic_Distance>0.6&
+                                              IBS_dist_within_regions_df$District=="Andara"))/
+  length(which(IBS_dist_within_regions_df$District=="Andara"))
+
+prop_highly_related_in_nyangana<- length(which(IBS_dist_within_regions_df$Genetic_Distance>0.6&
+                                               IBS_dist_within_regions_df$District=="Nyangana"))/
+  length(which(IBS_dist_within_regions_df$District=="Nyangana"))
+
+IBS_prop_related_pairs<- as.data.frame(cbind(c(prop_highly_related_in_andara,
+                                             prop_highly_related_in_nyangana,
+                                             prop_highly_related_in_rundu,
+                                             prop_highly_related_in_zambezi),
+                                       c("Andara","Nyangana","Rundu","Zambezi")))
+colnames(IBS_prop_related_pairs)<-c("Prop_Highly_Related","District")
+IBS_prop_related_pairs$Prop_Highly_Related<- as.numeric(as.character(IBS_prop_related_pairs$Prop_Highly_Related))
+```
+ **Question:** Why are so few pairs of samples highly related?
+ 
+ **Answer:** _Due to recombination and mutation, only samples that are very close together in the transmission chain of who-infected-whom will be highly related. Because not all infected individuals are sampled, unless transmission is very low, most samples will be unrelated._
+
+_**Definition:** Recombination is the process by which homologous chromosomes exchange information (alleles) during meiosis, after gametes mate in the mosquito._
+
+_**Definition:** Mutation is a change in the genetic sequence of an organism, such as a SNP, insertion, deletion, or duplication._
+
+**Question:** Using information from the lecture, as well as information about known transmission intensities in the four regions of Namibia that samples were taken from (Rundu, Andara, Nyangana, and Zambezi), assign each bar to a district. \ 
+
+```{r,echo=F}
+IBS_prop_related_pairs<- IBS_prop_related_pairs%>%
+  mutate(District_numbers= ifelse(District=="Andara", 1, ifelse(District=="Nyangana",2,ifelse(District=="Rundu",3,4))))
+
+IBS <- ggplot(IBS_prop_related_pairs) + 
+  geom_bar(aes(x=District_numbers, y=Prop_Highly_Related), stat="identity") + 
+  theme(legend.position = "none") + 
+  theme_linedraw() + 
+  theme(legend.position = "none") + 
+  xlab(NULL) + ylab("Proportion of Highly Related Pairs (IBS>0.6)")
+print(IBS)
+#IBD relatedness within Zambezi and Rundu (boxplot comparison) 
+```
+
+
+**Answer:**\ 
+
+```{r, echo=F}
+IBS <- ggplot(IBS_prop_related_pairs) + 
+  geom_bar(aes(x=District, y=Prop_Highly_Related, fill=District), stat="identity") + 
+  scale_fill_manual(values=c(admin_colours[3],admin_colours[2],
+                             admin_colours[1],admin_colours[4])) +
+  theme(legend.position = "none") + 
+  theme_linedraw() + 
+  theme(legend.position = "none") + 
+  xlab(NULL) + ylab("Proportion of Highly Related Pairs (IBS>0.6)")
+print(IBS)
+```
+
+Zambezi and Nyangana, regions with relatively low transmission, have the highest proportion of highly related pairs of infections. Rundu and Andara, regions with relatively high transmission have a low proportion of highly related pairs.  **With the exception of very low transmission settings that are nearing elimination, low transmission settings tend to have a greater proportion of pairs of samples that are highly related. On the other hand,  higher transmission settings tend to have a lower proportion of highly related pairs of samples.**
+
+We can also look at the overall distribution of relatedness between pairs by district (the dashed line shows the cutoff for pairs to be classified as highly related):
+
+**Question:** What do you notice about the distributions?  
+
+
+**Answer:** _This is a very open ended question and there may be other valid and interesting observations not listed here, but some features to note include that very few samples are highly related, some regions have more normal distributions whilst others are skewed more towards lower relatedness values._ 
+
+
+```{r,echo=F}
+IBS_dist_within_regions_df %>%
+  ggplot( aes(x=Genetic_Distance, fill = District)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'identity', bins=30) +
+    labs(fill="") + geom_vline(xintercept=0.6, linetype="dashed") + 
+    facet_wrap(~District)
+```
+
+# Using Genetic Differentiation to Characterize Malaria Transmission
+
+As well as looking at measures of genetic diversity of parasites to better understand malaria transmission intensity, we can use genetic data to understand connectivity across regions by looking at genetic differentiation (or relatedness) between the different subpopulations in different regions. 
+
+
+_**Definition:** Connectivity between two locations describes the flow of malaria parasites from one region to another._
+
+We can also use genetic relatedness measured by IBS between districts to estimate how connected two districts are. When there is more connection between two regions - i.e. people travel between the two regions, bringing parasites with them which can be transmitted to the local population if they are bitten by a competent mosquito vector - then districts will tend to share more highly related pairs. This can help determine whether transmission in one area may affect transmission in another, guiding the coordination of interventions in a region. We can compare pairwise relatedness between the four districts in Namibia: 
+\ 
+```{r, echo=F}
+meta_data<-meta_data[match(colnames(dist_1), meta_data$sample_id),]
+
+dist_groups_j<-dist_groups(dist_1, meta_data$district)
+colnames(dist_1)<-meta_data$district
+rownames(dist_1)<-meta_data$district
+
+
+dist_groups_d<-dist_groups(dist_2, meta_data$district)
+colnames(dist_2)<-meta_data$district
+rownames(dist_2)<-meta_data$district
+
+
+dist_by_grp_j<-dist_groups_j %>%
+  group_by(Label)  %>%
+summarize( mean = mean(Distance,na.rm=T))
+
+dist_by_grp_d<-dist_groups_d %>%
+  group_by(Label)  %>%
+summarize( mean = mean(Distance))
+
+prop_highly_related_j<-dist_groups_j %>%
+  group_by(Label)  %>%
+ count(Distance > 0.6) %>%
+  mutate(freq = n / sum(n)) %>%
+  filter(`Distance > 0.6` == TRUE)
+
+prop_highly_related_d<-dist_groups_d %>%
+  group_by(Label)  %>%
+ count(Distance > 0.6) %>%
+  mutate(freq = n / sum(n)) %>%
+  filter(`Distance > 0.6` == TRUE) 
+
+prop_highly_related_d<-prop_highly_related_d[-grep("Within",prop_highly_related_d$Label),]
+
+prop_highly_related_j<-prop_highly_related_j[-grep("Within",prop_highly_related_j$Label),]
+
+
+#prop_highly_related_j<- prop_highly_related_j[-which(is.na(prop_highly_related_j$Label)),]
+
+#prop_highly_related_j$Label<-replace(c(prop_highly_related_j$Label), c(1:6), c(
+                              #"Andara-\nNyangana",
+                              #"Andara-\nRundu",
+                              #"Andara-\nZambezi",
+                              #"Rundu-\nNyangana",
+                              #"Nyangana-\nZambezi",
+                             # "Rundu-\nZambezi"))
+
+prop_highly_related_j<- prop_highly_related_j%>%
+  mutate(Label_graph=ifelse(Label=="Between Andara District and Nyangana District", "Andara-Nyangana",
+                            ifelse(Label=="Between Andara District and Rundu East", "Andara-Rundu",
+                                   ifelse(Label=="Between Andara District and Zambezi", "Andara-Zambezi",
+                                        ifelse(Label=="Between Nyangana District and Zambezi", "Nyangana-Zambezi",
+                                               ifelse(Label=="Between Nyangana District and Rundu East", "Nyangana-Rundu",                                               "Rundu-Zambezi"))))))
+
+#prop_highly_related_d$Label<-replace(c(prop_highly_related_d$Label), c(1:6), c(
+                              #"Andara-\nNyangana",
+                             # "Andara-\nRundu",
+                              #"Andara-\nZambezi",
+                             # "Rundu-\nNyangana",
+                             # "Nyangana-\nZambezi",
+                            #  "Rundu-\nZambezi"))
+# prop_highly_related_d<- prop_highly_related_d[-which(is.na(prop_highly_related_d$Label)),]
+
+prop_highly_related_d<- prop_highly_related_d%>%
+  mutate(Label_graph=ifelse(Label=="Between Andara District and Nyangana District", "Andara-Nyangana",
+                            ifelse(Label=="Between Andara District and Rundu East", "Andara-Rundu",
+                                   ifelse(Label=="Between Andara District and Zambezi", "Andara-Zambezi",ifelse(Label=="Between Nyangana District and Rundu East", "Nyangana-Rundu",
+                                                                                                                  ifelse(Label=="Between Nyangana District and Zambezi", "Nyangana-Zambezi","Rundu-Zambezi"))))))
+
+
+prop_highly_related_j %>%
+  mutate(name = factor(Label_graph, levels=c(
+            "Andara-Nyangana",  "Andara-Rundu", "Andara-Zambezi","Nyangana-Zambezi" ,
+             "Nyangana-Rundu", "Rundu-Zambezi"))) %>%
+  ggplot() + 
+  geom_bar(aes(x=name, y=freq, fill=name), stat="identity", width=0.5) + 
+  scale_fill_discrete() +
+  theme(legend.position = "none") + 
+  theme_linedraw() + 
+  theme(legend.position = "none") + 
+  xlab(NULL) + ylab(" Proportion highly related by IBS (r > 0.6)")->IBS
+print(IBS)
+
+```
+
+
+![](relatedness_curves.png)
+
+
+The regions with the largest proportion of highly related pairs among them are three geographically closest regions,  Rundu, Nyangara and Andara. Comparisons between Zambezi and Rundu, Zambezi and Andara, and Zambezi and Nyangara have the lowest proportion of highly related pairs, consistent with geographic distance. **The least connected regions tend to have lower proportions of highly related pairs by IBS.**
+
+
+
+
+
+
+## $F_{st}$ and Jost's D
+
+
+***
+
+**Definition: Fixation index, or $F_{st}$ and Jost's D are both measures of genetic differentiation between different subpopulations.**
+
+When $F_{ST}$ is close to **1** it means that individuals in a population tend to carry a _small number of alleles_. Individuals are “differentiated” in the sense that alleles are not freely mixing between people.
+
+When Jost's D is close to **1** it means that alleles tend to be present in _a small number of individuals_. Individuals are “differentiated” in the sense that they contain different genetic material.
+
+***
+
+High values of $F_{st}$ and Jost's D both suggest a greater genetic differentiation between the subpopulations being measured. However both metrics have different approaches to measure genetic differentiation. 
+
+
+```{r, echo=F}
+load("allele_freq.RData")
+
+district_fst <- calcPopDiff(allele_freq, metric = "Fst")
+district_D <- calcPopDiff(allele_freq, metric = "Jost's D")
+
+fst_full_df <- data.frame(x=c("Andara-\nRundu",
+                              "Andara-\nNyangana",
+                              "Andara-\nZambezi",
+                              "Rundu-\nNyangana",
+                              "Rundu-\nZambezi",
+                              "Nyangana-\nZambezi"),
+                          y=c(district_fst[2, 1],
+                              district_fst[3, 1],
+                              district_fst[4, 1],
+                              district_fst[3, 2],
+                              district_fst[4, 2],
+                              district_fst[4, 3]))
+
+D_df <- data.frame(x=c("Andara-\nRundu",
+                              "Andara-\nNyangana",
+                              "Andara-\nZambezi",
+                              "Rundu-\nNyangana",
+                              "Rundu-\nZambezi",
+                              "Nyangana-\nZambezi"),
+                   y=c(district_D[2, 1],
+                              district_D[3, 1],
+                              district_D[4, 1],
+                              district_D[3, 2],
+                              district_D[4, 2],
+                              district_D[4, 3])
+)
+```
+
+
+**Question:** Using information from the lecture, as well as information about known transmission intensities in the four regions of Namibia that samples were taken from (Rundu, Andara, Nyangana, and Zambezi), which pairs of districts do you think will have the greatest values Jost's D measures and $F_{st}$ measures,  in other words, which districts will have the greatest genetic differentiation between them?
+
+
+
+**Answer:** _We can plot pairwise comparisons between the four districts._ 
+
+
+
+```{r, echo=F}
+fst_p <- ggplot(fst_full_df) + 
+  geom_bar(aes(x=x, y=y, fill=x), stat="identity", width=0.5) + 
+  scale_fill_discrete() +
+  theme(legend.position = "none") + 
+  theme_linedraw() + 
+  theme(legend.position = "none") + 
+  xlab(NULL) + ylab("Fst")
+print(fst_p)
+D_p <- ggplot(D_df) + 
+  geom_bar(aes(x=x, y=y, fill=x), stat="identity", width=0.5) + 
+  scale_fill_discrete() +
+  theme_linedraw() + 
+  theme(legend.position = "none") +
+  xlab(NULL) + ylab("Jost's D")
+print(D_p)
+```
+
+
+
+
+
+The pairwise comparisons with Zambezi (Rundu-Zambezi, Andara-Zambezi, Nyangana-Zambezi) have the highest values of $F_{st}$ and Jost's D, which is consistent with Zambezi being a low transmission region, as well as the geographical distance between Zambezi sampling sites and the other three regions. 
+
+**Both high Jost's D and $F_{st}$ are consistent with populations being more differentiated from each other, either through less mixing ($F_{st}$) or different genetic material (Jost's D)**
+
+**Question:**Compare and contrast results obtained by FST, Jost's D, to the inter district relatedness by IBD and IBS. How are they different? How are they the same? Why might there be differences?
+
+
+**Answer:** _The highest values of FST and Jost's D were in pairwise comparisons between Zambezi and other regions, suggesting the highest levels of differentiation both in terms of the populations containing different genetic material and in alleles not flowing as freely between those populations. This is also reflected in Zambezi containing a lower proportion of highly related pairs by IBS with other regions._
+
+
+
