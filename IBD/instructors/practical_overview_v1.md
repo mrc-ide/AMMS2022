@@ -1,6 +1,18 @@
 # Practical Overview
 - *Duration*: 1.5 hrs
 
+# Potential Issues/Concerns
+- Level of coding of participants
+  + Motivation/struggle vs learning
+- Code given to participants vs writing own code
+  + Balance of concept versus teaching code
+- Cut IBS AF nuanced point?
+- IRS dataset --> Tessema transmission intensity?
+- If simulated data, island as back-up
+- host results of IBS and IBD in an Rdata file
+- flash drive w/ packages for dependencies 
+
+
 
 ## Key Concepts
 - IBS is affected by PLAF and can produce biased estimates of relatedness
@@ -38,11 +50,15 @@
 - Contrast w/ measures of population differentiation (vs individualistic pairwise IBD)
 - Look at COI vs IBD segment length --> transmission intensity
   + Can hmmIBD give us segment lengths, no right? can do proportion of highly related pairs instead
+- Sniff test --> intuition
+- More things we can do w/ IBD
+
+
 
 ## Part 4: Questions & Advanced Section
 - Polyclonal infections
   + isoRelate
-  + deploidIBD 
+  + deploidIBD
 
 
 # Bob notes
