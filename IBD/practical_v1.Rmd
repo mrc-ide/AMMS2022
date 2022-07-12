@@ -1,0 +1,100 @@
+---
+title: "AMMS IBS & IBD Practical" 
+author: "Nick Brazeau, Sophie Berube, Izzy Routledge"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    theme: readable
+    highlight: tango
+    code_folding: hide
+    toc: yes
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
+    number_sections: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F, 
+                      fig.align = 'center', fig.keep = 'all')
+```
+
+<!-- Here we style out button a little bit -->
+
+```{=html}
+<style>
+.showopt {
+background-color: #004c93;
+color: #FFFFFF; 
+width: 100px;
+height: 20px;
+text-align: center;
+vertical-align: middle !important;
+border-radius: 8px;
+float:right;
+}
+
+.showopt:hover {
+background-color: #dfe4f2;
+color: #004c93;
+}
+
+</style>
+```
+<!--Include script for hiding output chunks-->
+
+```{=html}
+<script src="misc/hideOutput.js"></script>
+```
+# Dependencies for Practical {-}
+
+Please copy and paste the below code chunk in it's entirety to your console to download R package libraries needed for this practical. If you are having trouble installing any of the R packages, please ask an instructor for a pre-loaded flash drive.
+
+```{r, echo=T}
+deps <- c("tidyverse", "vcfR", "hmmibdr", "sf", "tidygraph")
+deps <- !sapply(deps, function(x){x %in% installed.packages()[,1]} )
+if(any(deps)) {
+  if(deps["hmmibdr"]) {
+    if (!"remotes" %in% installed.packages()[,1]){install.packages("remotes")}
+    remotes::install_github("OJWatson/hmmibdr")
+    deps <- deps[names(deps) != "hmmibdr"]
+  } else {
+    install.packages(names(deps)[deps])
+  }
+}
+
+```
+
+Please now load all of those libraries into this session using the code chunk below. Please copy and paste it in its entirety.
+
+```{r, echo=T}
+library(tidyverse)
+library(vcfR)
+library(hmmibdr)
+library(sf)
+library(tidygraph)
+```
+
+# IBS/IBD Primer {-}
+***
+
+# Overview of Data {-}
+***
+
+# Practical Goals {-}
+By the end of this practical, you should understand the following concepts: 
+
+
+-------------------------
+# Importing Data
+
+Here, we will use the `vcfR` [package](https://knausb.github.io/vcfR_documentation/) to read in our variant call file (VCF) that contains biallelic SNPs for our \*\*\* individuals across our four populations.
+
+Using the skills that you acquired yesterday, read in the VCF from our data folder that you downloaded from Github: `data/relatedness_fourpops.vcf`. If you are having trouble locating the file on your computer, please type `file.choose` into your console for an interactive option to locate the file. Name the object (the vcf file you are reading in) *vcf* for simplicity.
+
+```{r}
+vcf <- vcfR::read.vcfR("data/play4.vcf")
+```
