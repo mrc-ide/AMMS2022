@@ -54,13 +54,21 @@ color: #004c93;
 Please copy and paste the below code chunk in it's entirety to your console to download R package libraries needed for this practical. If you are having trouble installing any of the R packages, please ask an instructor for a pre-loaded flash drive.
 
 ```{r, echo=T}
-deps <- c("tidyverse", "vcfR", "hmmibdr", "sf", "tidygraph")
+deps <- c("tidyverse", "vcfR", "MIPanalyzer", "hmmibdr", "sf", "tidygraph")
 deps <- !sapply(deps, function(x){x %in% installed.packages()[,1]} )
 if(any(deps)) {
   if(deps["hmmibdr"]) {
-    if (!"remotes" %in% installed.packages()[,1]){install.packages("remotes")}
+    if (!"remotes" %in% installed.packages()[,1]){
+      install.packages("remotes")
+    }
     remotes::install_github("OJWatson/hmmibdr")
     deps <- deps[names(deps) != "hmmibdr"]
+  } else if(deps["MIPanalyzer"]) {
+    if (!"remotes" %in% installed.packages()[,1]){
+      install.packages("remotes")
+    }
+    remotes::install_github("mrc-ide/MIPanalyzer")
+    deps <- deps[names(deps) != "MIPanalyzer"]
   } else {
     install.packages(names(deps)[deps])
   }
@@ -97,4 +105,12 @@ Using the skills that you acquired yesterday, read in the VCF from our data fold
 
 ```{r}
 vcf <- vcfR::read.vcfR("data/play4.vcf")
+```
+
+
+
+
+```{r}
+mip <- MIPanalyzer::vcf2mipanalyzer_biallelic(vcfR = vcf)
+
 ```
