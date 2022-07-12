@@ -1,9 +1,9 @@
 
-COI/.git_ignore/hendry_convo_712022.md
-
+# Mac file
 .DS_Store
 
-IBD/instructors/images/~$Presentation1.pptx
+# NFB files
+IBD/instructors/images/*.pptx
 
-*.pptx
+# R files
 .Rproj.user
