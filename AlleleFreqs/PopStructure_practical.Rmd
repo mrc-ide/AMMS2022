@@ -1,0 +1,153 @@
+---
+title: "AMMS Population Structure from Allele Frequencies Practical" 
+author: "Izzy Routledge, Bob Verity"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    theme: readable
+    highlight: tango
+    code_folding: hide
+    toc: yes
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
+    number_sections: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F, 
+                      fig.align = 'center', fig.keep = 'all')
+```
+
+<!-- Here we style out button a little bit -->
+
+```{=html}
+<style>
+.showopt {
+background-color: #004c93;
+color: #FFFFFF; 
+width: 100px;
+height: 20px;
+text-align: center;
+vertical-align: middle !important;
+border-radius: 8px;
+float:right;
+}
+
+.showopt:hover {
+background-color: #dfe4f2;
+color: #004c93;
+}
+
+</style>
+```
+
+# Dependencies for Practical {-}
+
+Please copy and paste the below code chunk in it's entirety to your console to download R package libraries needed for this practical. If you are having trouble installing any of the R packages, please ask an instructor for a pre-loaded flash drive.
+
+```{r, echo=T}
+# deps <- c("tidyverse", "vcfR", , "sf", "tidygraph", "hierfstat","rmaverick")
+# deps <- !sapply(deps, function(x){x %in% installed.packages()[,1]} )
+# if(any(deps)) {0
+#   if(deps["hierfstat"]) {
+#     if(!"gaston" %in% installed.packages()[,1]){
+#       install.packages("gaston")
+#     }
+#     }if(deps["rmaverick"]){
+#       devtools::install_github("bobverity/rmaverick")
+#     } else  {
+#     install.packages(names(deps)[deps])
+#   }
+# }
+
+
+```
+
+Now load all of those libraries into this session using the code chunk below. Please copy and paste it in its entirety.
+
+```{r, echo=T}
+library(tidyverse)
+library(vcfR)
+library(rmaverick)
+library(hierfstat) 
+library(sf)
+library(tidygraph)
+```
+
+# Intro to population structure and allele frequency metrics {-}
+-Why useful for epi?
+***
+
+# Overview of Data {-}
+ 
+***
+
+# Practical Goals {-}
+By the end of this practical, you should be able to: 
+
+- Calculate allele frequencies from genetic data 
+- Estimate metrics such as FST and explain what they can tell us about population differentiation
+- Appreciate how allele frequency methods can identify connectivity over large spatial scales and long temporal scales
+- Explain how allele frequencies can give useful information, and also describe their limitations for malaria control purposes
+
+
+-------------------------
+# Importing Data
+
+Here, we will use the `vcfR` [package](https://knausb.github.io/vcfR_documentation/) to read in our variant call file (VCF) that contains biallelic SNPs for our \*\*\* individuals across our four populations.
+
+Read in the VCF from our data folder that you downloaded from Github: `data/INSERTFILEPATH.vcf`. If you are having trouble locating the file on your computer, please type `file.choose` into your console for an interactive option to locate the file. Name the object (the vcf file you are reading in) *vcf* for simplicity.
+
+```{r}
+#vcf <- vcfR::read.vcfR("data/FILEPATH.vcf")
+```
+
+
+
+# Calculating Allele Frequencies from VCF data
+- Define allele frequencies
+- Explain 
+- Recycle code from drug resistance practical 
+
+```{r}
+
+
+```
+# Calculating FST
+- Define FST
+- Explain how and when it is used
+- recycle code from Namibia? But not in VCF format
+
+```{r}
+
+
+```
+
+# Using PCA / PCoA to identify population structure
+
+
+
+
+```{r}
+
+
+```
+#STRUCTURE / rmaverick
+
+
+
+```{r}
+
+
+```
+#Tests for  isolation by distance (e.g. Rousset’s method, Mantel test)
+
+
+```{r}
+
+
+```
