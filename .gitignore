@@ -7,5 +7,4 @@ IBD/instructors/images/*.pptx
 
 # R files
 .Rproj.user
-
-COI/.Rhistory
+.Rhistory
