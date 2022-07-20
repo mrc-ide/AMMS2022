@@ -11,7 +11,7 @@
 
 <meta name="author" content="Izzy Routledge, Bob Verity" />
 
-<meta name="date" content="2022-07-12" />
+<meta name="date" content="2022-07-19" />
 
 <title>AMMS Population Structure from Allele Frequencies Practical</title>
 
@@ -1677,7 +1677,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">AMMS Population Structure from Allele Frequencies Practical</h1>
 <h4 class="author">Izzy Routledge, Bob Verity</h4>
-<h4 class="date">July 12, 2022</h4>
+<h4 class="date">July 19, 2022</h4>
 
 </div>
 
@@ -1725,12 +1725,17 @@ color: #004c93;
 <span id="cb2-5"><a href="#cb2-5"></a><span class="kw">library</span>(sf)</span>
 <span id="cb2-6"><a href="#cb2-6"></a><span class="kw">library</span>(tidygraph)</span></code></pre></div>
 </div>
-<div id="intro-to-population-structure-and-allele-frequency-metrics" class="section level1 unnumbered">
-<h1>Intro to population structure and allele frequency metrics</h1>
-<p>-Why useful for epi? ***</p>
+<div id="intro-to-activity" class="section level1 unnumbered">
+<h1>Intro to activity</h1>
+<p>In this activity, we will analyse a dataset from (Namibia? DRC?) to learn about allele frequencies, how to calculate metrics of population structure and genetic differentiation from these allele frequencies, and what these metrics can and cannot tell us from an epidemiological perspective.</p>
+<p>The frequency of alleles in a population can vary greatly between populatuions</p>
+<p>Definition: An allele is the identity of a particular genetic locus or sequence that is inherited between parents and offspring.</p>
+<p>Definition: A locus is a fixed position on a chromosome where a particular genetic marker is located.</p>
+<hr />
 </div>
 <div id="overview-of-data" class="section level1 unnumbered">
 <h1>Overview of Data</h1>
+<p>Datasets: -DRC? -Namibia?</p>
 <hr />
 </div>
 <div id="practical-goals" class="section level1 unnumbered">
@@ -1751,20 +1756,24 @@ color: #004c93;
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1"></a><span class="co">#vcf &lt;- vcfR::read.vcfR(&quot;data/FILEPATH.vcf&quot;)</span></span></code></pre></div>
 </div>
 <div id="calculating-allele-frequencies-from-vcf-data" class="section level1">
-<h1><span class="header-section-number">2</span> Calculating Allele Frequencies from VCF data</h1>
+<h1><span class="header-section-number">2</span> Calculating Allele Frequencies (from VCF data?)</h1>
 <ul>
 <li>Define allele frequencies</li>
 <li>Explain</li>
-<li>Recycle code from drug resistance practical</li>
+<li>Recycle code from drug resistance practical - Abebe can provide perhaps?</li>
 </ul>
 </div>
-<div id="calculating-fst" class="section level1">
-<h1><span class="header-section-number">3</span> Calculating FST</h1>
+<div id="calculating-fst-and-josts-d" class="section level1">
+<h1><span class="header-section-number">3</span> Calculating FST and Jost’s D</h1>
 <ul>
 <li>Define FST</li>
 <li>Explain how and when it is used</li>
 <li>recycle code from Namibia? But not in VCF format</li>
 </ul>
+<p>Definition: Fixation index, or Fst and Jost’s D are both measures of genetic differentiation between different subpopulations.</p>
+<p>When FST is close to 1 it means that individuals in a population tend to carry a small number of alleles. Individuals are “differentiated” in the sense that alleles are not freely mixing between people.</p>
+<p>When Jost’s D is close to 1 it means that alleles tend to be present in a small number of individuals. Individuals are “differentiated” in the sense that they contain different genetic material.</p>
+<p>High values of Fst and Jost’s D both suggest a greater genetic differentiation between the subpopulations being measured. However both metrics have different approaches to measure genetic differentiation.</p>
 </div>
 <div id="using-pca-pcoa-to-identify-population-structure" class="section level1">
 <h1><span class="header-section-number">4</span> Using PCA / PCoA to identify population structure</h1>
