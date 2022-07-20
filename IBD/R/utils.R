@@ -1,3 +1,4 @@
+
 #' @title shhh
 #' @description sinks annoying calls to console
 quiet <- function(x) {
@@ -13,21 +14,34 @@ view_recombo <- function(generations_apart) {
   # draw recombo
   matbk <- sort( runif(n = generations_apart, min = 0, max = 1) )
   patbk <- sort( runif(n = generations_apart, min = 0, max = 1) )
+  if (generations_apart == 0) {
+    plotdat <- tibble::tibble(start = 0,
+                              end = 1,
+                              ibdchar = "Orig",
+                              ibdfct = factor(ibdchar, levels = c("Orig", "New")),
+                              par = c("mat", "pat"),
+                              ymin = ifelse(par == "mat", 0.1, 1.1),
+                              ymax = ifelse(par == "mat", 1, 2))
+  } else {
   # tidy and plot
-  plot <- tibble::tibble(start = c(0,matbk, 0, patbk),
+  plotdat <- tibble::tibble(start = c(0,matbk, 0, patbk),
                          end = c(matbk,1, patbk, 1),
                          par = c(rep("mat", generations_apart+1),
                                  rep("pat", generations_apart+1)
                          )) %>%
     dplyr::mutate(
-      ibd = ifelse(generations_apart != 0, rbinom(dplyr::n(), 1, 0.5), 0),
+      ibd = rbinom(dplyr::n(), 1, 0.5),
       ibdchar = ifelse(ibd == 0, "Orig", "New"),
+      ibdfct = factor(ibdchar, levels = c("Orig", "New")),
       ymin = ifelse(par == "mat", 0.1, 1.1),
-      ymax = ifelse(par == "mat", 1, 2)) %>%
+      ymax = ifelse(par == "mat", 1, 2))
+  }
+  # plot
+  plot <- plotdat %>%
     ggplot() +
     geom_rect(aes(xmin = start, xmax = end,
                   ymin = ymin, ymax = ymax,
-                  fill = ibdchar)) +
+                  fill = ibdfct)) +
     scale_fill_viridis_d("Identity") +
     labs(title = "Breakdown of Clonal Material over Generations",
          x = "Genomic Position") +
