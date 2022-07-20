@@ -100,19 +100,19 @@ During prior sessions, you have explored how to estimate genetic relatedness bas
 
 <p align="center">
 
-![](https://raw.githubusercontent.com/nickbrazeau/AMMS/master/R_ignore/images/ibdsiblings.png){width="500px"}
+![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/ibdsiblings.png){width="500px"}
 
 Remember, that recombination and random segregation occurs with homologous chromosome pairing during the process of meiosis. This means that "maternal" and "paternal" genetic material is exchanged to create new "daughter" cells with unique genetic material (e.g. a new, unique haplotype).
 
 <p align="center">
 
-![](https://raw.githubusercontent.com/nickbrazeau/AMMS/master/R_ignore/images/meisosis.jpeg){height="300px"}
+![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/Meiosis.jpeg){height="300px"}
 
 From a population genetics perspective, this exchange of genetic material via recombination can be leveraged to detect strong signals of genetic relatedness between individuals. For example, moving further along in the schematic, the mosquito bites three new hosts and transfers a single strain of "daughter" genetic material (*N.B.*, since only a single strain was transmitted, no cotransmission infections resulted despite the potential). The pedigree on the right shows two of the parasite siblings and highlights how much of their genome is "identical" or, was inherited from the same parent in the same genomic location (identity by descent). <br> As a result, one way to conceptualize the genome is as blocks, or segments, that are joined together. Each block has its own unique ancestral history, with a different "tree" of relatedness as depicted in the schematic below. Additionally, as we look further and further back in time, these blocks become smaller and our trees become "deeper". We will explore this concept that increasing time, or increasing generations, results in smaller blocks (*i.e.* as the number of recombination events increases, blocks are broken into smaller and smaller bits).
 
 <p align="center">
 
-![](https://raw.githubusercontent.com/nickbrazeau/AMMS/master/R_ignore/images/mini_arg.png){width="500px"}
+![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/mini_arg.png){width="500px"}
 
 # IBS/IBD Primer {.unnumbered}
 
@@ -120,7 +120,7 @@ As described above, we can consider pairwise relatedness by determining if the g
 
 <p align="center">
 
-![](https://raw.githubusercontent.com/nickbrazeau/AMMS/master/R_ignore/images/ibd_vs_ibs.png){width="500px"}
+![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/ibd_vs_ibs.png){width="500px"}
 
 ## IBState {.unnumbered}
 
@@ -134,10 +134,12 @@ As described above, IBD is more complicated to calculate than IBS and requires s
 
 _**Conceptual Question:** What are some reasons that parasite pairs may be IBS but not IBD? What is a method that you have already learned that would increase your suspicion for IBS but not IBD_
 
-_**Answer:** Population allele frequencies (if an allele is very common or fixed in a population, it does not contain as much information if it is identical by descent versus simply by state)*_
+_**Answer:** Population allele frequencies (if an allele is very common or fixed in a population, it does not contain as much information if it is identical by descent versus simply by state)_
 <br> 
 <br> 
-_**Conceptual Question:** Are biallelic markers (genotypic positions with two alleles, or possibilities) or multiallelic markers (genotypic positions with multiple alleles) more informative for IBS/IBD. Would you suspect a site with 20 alleles to be identical by chance?* <br> ***Answer:** Multiallelic has more information_
+_**Conceptual Question:** Are biallelic markers (genotypic positions with two alleles, or possibilities) or multiallelic markers (genotypic positions with multiple alleles) more informative for IBS/IBD. Would you suspect a site with 20 alleles to be identical by chance?_ 
+<br>
+_**Answer:** Multiallelic has more information_
 
 # Overview of Data {.unnumbered}
 
@@ -153,7 +155,7 @@ _\*As discussed yesterday, COI is a poor measure of incidence in the real world.
 
 <p align="center">
 
-![](https://raw.githubusercontent.com/nickbrazeau/AMMS/master/R_ignore/images/sim_deme_schematic.png){width="500px"}
+![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/sim_deme_schematic.png){width="500px"}
 
 # Practical Goals {.unnumbered}
 
@@ -372,7 +374,7 @@ Coalescent theory is one of the central pillars of population genetics and provi
 
 <p align="center">
 
-![ARG for Three Samples with Two Discrete Loci](https://raw.githubusercontent.com/nickbrazeau/AMMS/master/R_ignore/images/arg.png){width="500px"}
+![ARG for Three Samples with Two Discrete Loci](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/arg.png){width="500px"}
 
 <br>
 
