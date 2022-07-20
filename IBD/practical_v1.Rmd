@@ -1,6 +1,6 @@
 ---
 title: "AMMS IBS & IBD Practical" 
-author: "Nick Brazeau, Sophie Berube, Izzy Routledge"
+author: "Sophie Berube, Izzy Routledge, Nick Brazeau"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output: 
   html_document:
@@ -49,12 +49,12 @@ color: #004c93;
 ```{=html}
 <script src="misc/hideOutput.js"></script>
 ```
-# Dependencies for Practical {-}
+# Dependencies for Practical {.unnumbered}
 
 Please copy and paste the below code chunk in it's entirety to your console to download R package libraries needed for this practical. If you are having trouble installing any of the R packages, please ask an instructor for a pre-loaded flash drive.
 
 ```{r, echo=T}
-deps <- c("tidyverse", "vcfR", "MIPanalyzer", "hmmibdr", "sf", "tidygraph")
+deps <- c("tidyverse", "vcfR", "MIPanalyzer", "hmmibdr", "sf", "tidygraph", "ggraph")
 deps <- !sapply(deps, function(x){x %in% installed.packages()[,1]} )
 if(any(deps)) {
   if(deps["hmmibdr"]) {
@@ -84,33 +84,298 @@ library(vcfR)
 library(hmmibdr)
 library(sf)
 library(tidygraph)
+library(ggraph)
+library(cowplot)
 ```
 
-# IBS/IBD Primer {-}
-***
+Finally, please source (*i.e.* load) the file called `utils.r` that is stored under the `IBD/R` directory. If you are using the `IBD.Rproj` environment, you can just run `source("R/utils.R")` as below. Or if you are running from a different environment or working directory (`getwd()`), use the `file.choose` function to help locate the file.
 
-# Overview of Data {-}
-***
+```{r}
+source("R/utils.R")
+```
 
-# Practical Goals {-}
-By the end of this practical, you should understand the following concepts: 
+# Relatedness {.unnumbered}
 
+During prior sessions, you have explored how to estimate genetic relatedness based on levels of population diversity, structure, and connectivity. In this practical, we will focus on between-parasite, or pairwise, measures of genetic relatedness. These are more "individual" focused measures of relatedness versus population, or deme, focused measures of relatedness. <br> In the schematic below, a single mosquito has bitten two different individuals infected with a single strain of the malaria parasite, resulting in a superinfection. The two strains (red vs purple) then undergo recombination in the mosquito midgut and produce progeny that are siblings and expected to share half of their genomes on average. <br>
 
--------------------------
+<p align="center">
+
+![](https://raw.githubusercontent.com/nickbrazeau/AMMS/master/R_ignore/images/ibdsiblings.png){width="500px"}
+
+Remember, that recombination and random segregation occurs with homologous chromosome pairing during the process of meiosis. This means that "maternal" and "paternal" genetic material is exchanged to create new "daughter" cells with unique genetic material (e.g. a new, unique haplotype).
+
+<p align="center">
+
+![](https://raw.githubusercontent.com/nickbrazeau/AMMS/master/R_ignore/images/meisosis.jpeg){height="300px"}
+
+From a population genetics perspective, this exchange of genetic material via recombination can be leveraged to detect strong signals of genetic relatedness between individuals. For example, moving further along in the schematic, the mosquito bites three new hosts and transfers a single strain of "daughter" genetic material (*N.B.*, since only a single strain was transmitted, no cotransmission infections resulted despite the potential). The pedigree on the right shows two of the parasite siblings and highlights how much of their genome is "identical" or, was inherited from the same parent in the same genomic location (identity by descent). <br> As a result, one way to conceptualize the genome is as blocks, or segments, that are joined together. Each block has its own unique ancestral history, with a different "tree" of relatedness as depicted in the schematic below. Additionally, as we look further and further back in time, these blocks become smaller and our trees become "deeper". We will explore this concept that increasing time, or increasing generations, results in smaller blocks (*i.e.* as the number of recombination events increases, blocks are broken into smaller and smaller bits).
+
+<p align="center">
+
+![](https://raw.githubusercontent.com/nickbrazeau/AMMS/master/R_ignore/images/mini_arg.png){width="500px"}
+
+# IBS/IBD Primer {.unnumbered}
+
+As described above, we can consider pairwise relatedness by determining if the genetic sequence at a give position in the genome, a loci, between two parasites is identical (e.g. the same allele). We can either simply measure the number of sites with identical alleles between two individuals, termed identity by state (IBS), or, we can use statistical models to determine if identical alleles and "blocks" of the genome were likely to be inherited from a common ancestor, termed identity by descent (IBD). It is important to note the differences between IBS and IBD: IBS refers to the "state" or realization of the allele at a loci and can be the result of numerous factors other than ancestry (e.g. selection, drift, structure, chance). In contrast, IBD solely refers to inherited genetic material, which follow specific patterns relevant to public health that we will explore below. The differences between IBS and IBD are visualized in the schematic below, where sites may be IBS but not IBD whilst all sites that are IBD are IBS (*N.B.* only true under the classic definition of IBD).
+
+<p align="center">
+
+![](https://raw.githubusercontent.com/nickbrazeau/AMMS/master/R_ignore/images/ibd_vs_ibs.png){width="500px"}
+
+## IBState {.unnumbered}
+
+As stated above, identity by state, is the proportion of identical loci divided by all measured loci in the genome (shared over total) between two parasites: $\mbox{parasite}_a$ and $\mbox{parasite}_b$, such that: $$IBS= \frac{\mbox{Shared loci}_{ab}}{\mbox{Number of loci}}$$
+
+## IBDescent {.unnumbered}
+
+As described above, IBD is more complicated to calculate than IBS and requires statistical modeling in order to account for recombination and population allele frequencies. The most common statistical model used is called a Hidden Markov Model (see the *Advanced* section for further sources).
+
+<br> 
+
+_**Conceptual Question:** What are some reasons that parasite pairs may be IBS but not IBD? What is a method that you have already learned that would increase your suspicion for IBS but not IBD_
+
+_**Answer:** Population allele frequencies (if an allele is very common or fixed in a population, it does not contain as much information if it is identical by descent versus simply by state)*_
+<br> 
+<br> 
+_**Conceptual Question:** Are biallelic markers (genotypic positions with two alleles, or possibilities) or multiallelic markers (genotypic positions with multiple alleles) more informative for IBS/IBD. Would you suspect a site with 20 alleles to be identical by chance?* <br> ***Answer:** Multiallelic has more information_
+
+# Overview of Data {.unnumbered}
+
+This data was simulated using a simple malaria model that takes into account spatial relationships, complexity of infection (COI), and population size under a Wright-Fisher model: [PolySimIBD](https://github.com/nickbrazeau/polySimIBD). Later, you will have an opportunity to interact with this simulator to further fine tune your intuition for IBS/IBD in the _Self Exploration_ section. <br> Here, we have simulated five populations, or demes: A-E. The demes were simulated to have the same number of people, or hosts; however, we have randomly selected five individuals from each deme to undergo molecular surveillance and be "sequenced" (_i.e._ in real life, you may select five participants from a village to donate whole-blood vs collecting blood from every individual in the village). The demes have varying intensity of transmission, or incidence, as indicated by the spectrum of yellow-red in the legend. In addition, we expect for mosquitoes to migrate between the demes with respect to how far the demes are from each other (_i.e._ C and D are close, therefore we may expect mosquitoes to transport parasites between those demes more than from A to D). Finally, we hypothesize that the ocean between demes A-D and E is a barrier to any transmission from the "mainland" to the "island" (_i.e._ we expect mainland parasites to be distinct from island parasites). In summary, the data consists of:    
+
+- Five demes (4 mainland, 1 island)   
+- Locations are known for each deme    
+- Five random samples from each deme 
+- Incidence as estimated by mean COI per deme\*
+
+_\*As discussed yesterday, COI is a poor measure of incidence in the real world. For our model, it is quite correlated and will be used as a proxy here._
+<br>
+
+<p align="center">
+
+![](https://raw.githubusercontent.com/nickbrazeau/AMMS/master/R_ignore/images/sim_deme_schematic.png){width="500px"}
+
+# Practical Goals {.unnumbered}
+
+By the end of this practical, you should understand the following concepts:    
+
++ IBS is straightforward to calculate but can produce biased estimates of relatedness (*i.e.* does not necessarily reflect ancestry and is affected by population level allele frequencies)   
++ IBD captures recent relatedness, useful for determining transmission events/transmission intensity, importation, corridors of gene flow   
+- Therefore, IBS/IBD can measure connectivity on spatial/temporal scales relevant to control   
+
++ IBD theoretically follows the concept isolation by distance; when it doesn't, interesting things are happening  
+
+------------------------------------------------------------------------
+
 # Importing Data
 
-Here, we will use the `vcfR` [package](https://knausb.github.io/vcfR_documentation/) to read in our variant call file (VCF) that contains biallelic SNPs for our \*\*\* individuals across our four populations.
+Here, we will use the `vcfR` [package](https://knausb.github.io/vcfR_documentation/) to read in our variant call file (VCF) that contains fifty biallelic SNPs for our twenty-five individuals across our five populations (A, B, C, D, E; *named* A1-5, B1-5, ...).
 
-Using the skills that you acquired yesterday, read in the VCF from our data folder that you downloaded from Github: `data/relatedness_fourpops.vcf`. If you are having trouble locating the file on your computer, please type `file.choose` into your console for an interactive option to locate the file. Name the object (the vcf file you are reading in) *vcf* for simplicity.
+Using the skills that you acquired yesterday, read in the VCF from our data folder that you downloaded from Github: `data/relatedness_fourpops.vcf`. If you are having trouble locating the file on your computer, please type `file.choose` into your console for an interactive option to locate the file. Name the object (the vcf file you are reading in) "vcf" for simplicity.
 
 ```{r}
-vcf <- vcfR::read.vcfR("data/play4.vcf")
+# participants DO NOT need to include the quiet bit
+vcf <- quiet(vcfR::read.vcfR("data/simulated_ibd.vcf.gz"))
+```
+
+## Initial QC
+
+As is always good practice, we can check our VCF for missing data and confirm it has the number of SNPs and samples that we expected. Explore the details and inner-workings of our new VCF to get a sense if it is trustworthy (Does the data look reasonable? Is there anything strange in the INFO column?). In addition, use the `extract.gt` function from the vcfR package to pull out the allele depth (first record) for your new VCF. Now plot that allele depth as an initial data exploration using the `heatmap.bp` function.
+
+```{r}
+ad <- vcfR::extract.gt(vcf, element = "AD", as.numeric = T)
+vcfR::heatmap.bp(ad)
+```
+
+Does the above plot indicate that our VCF looks high quality?
+
+While it does look quality, there are several features that would make you question if it was real data:   
+
+- All of the REF/ALT basepair allele calls are "N" missing  
+- All of the loci allele depths are 100  
+- The QUALTIY column is all the same  
+<br>
+
+This data was simulated, and thus, lacks many of the "real world" appearances of a VCF generated from real sequencing data. It is always valuable to manually look at the VCF (or portions of it is large) to determine it's validity before starting analyses (for those interested or with time at the end of the tutorial, please see the *Advanced Section* for command line manipulations of the VCF)! <br>
+
+## Data Manipulation
+
+MIP VCF
+
+```{r}
+mipvcf <- MIPanalyzer::vcf2mipanalyzer_biallelic(vcfR = vcf)
+```
+
+# Visualizing Recombination
+
+stick breaking `view_recombo` For example, you could run the function with the following generational times. 
+
+
+```{r, eval=F}
+view_recombo(generations_apart = 0)
+view_recombo(generations_apart = 1)
+view_recombo(generations_apart = 2)
+view_recombo(generations_apart = 3)
+view_recombo(generations_apart = 5)
+view_recombo(generations_apart = 10)
+view_recombo(generations_apart = 20)
+```
+_**Conceptual Question:** How does the amount of "clonal" genetic material change, or amount of the genome that is identical, change between the paired samples as we increase the number of generations that separates them?_
+
+
+
+# Identity by State
+***
+```{r}
+# get IBS
+ibs <- MIPanalyzer::get_IBS_distance(x = mipvcf,
+                                     ignore_het = FALSE,
+                                     report_progress = FALSE)
+# tidy result
+colnames(ibs) <- rownames(ibs) <- colnames(vcf@gt)[2:ncol(vcf@gt)]
+
+ibs_long <- broom::tidy(as.dist(ibs)) %>%  
+  magrittr::set_colnames(c("p1", "p2", "ibsdist"))
+```
+
+# Identity by Descent
+*** 
+```{r}
+#......................
+# MLE IBD
+#......................
+ibd <- MIPanalyzer::inbreeding_mle(x = mipvcf,
+                                   f = seq(0.01, 0.99, 0.01),
+                                   ignore_het = FALSE,
+                                   report_progress = FALSE)
+# tidy result
+diag(ibd$mle) <- 1
+colnames(ibd$mle) <- rownames(ibd$mle) <- colnames(vcf@gt)[2:ncol(vcf@gt)]
+
+ibd_long <- broom::tidy(as.dist(t(ibd$mle))) %>%  # note, mipanalyzer returns upper triangle
+  magrittr::set_colnames(c("p1", "p2", "malecotf"))
 ```
 
 
-
-
 ```{r}
-mip <- MIPanalyzer::vcf2mipanalyzer_biallelic(vcfR = vcf)
+#......................
+# hmmIBD 
+#......................
+```
+
+# Applied IBD
+*** 
+## IBS vs IBD
+
+***
+Why so different? 
+PLAF plot -> small populations, which is how data was simulated
+
+## IBD Distribution
+```{r}
+mainplot <- ibd_long %>%
+  ggplot() +
+  geom_histogram(aes(x=malecotf, y = (..count../sum(..count..))*100),
+                 color = "#000000", fill = "#d9d9d9") +
+  xlab("IBD") + ylab("frequency (%)") +
+  theme_classic()
+
+insetplot <- ibd_long %>%
+  ggplot() +
+  geom_histogram(aes(x=malecotf, y = (..count../sum(..count..))*100),
+                 color = "#000000", fill = "#d9d9d9") +
+  xlab("IBD") + ylab("frequency (%)") +
+  theme_classic() +
+  coord_cartesian(xlim = c(0.5,1), ylim = c(0,0.8)) +
+  theme_bw() +
+  theme(panel.background = element_rect(fill = "transparent"),
+        plot.background = element_rect(fill = "transparent"))
+# cowplot
+cowplot::ggdraw() +
+  cowplot::draw_plot(mainplot, x = 0, y = 0, width = 1, height = 1, scale = 1) +
+  cowplot::draw_plot(insetplot, x = 0.5, y= 0.3, width = 0.4, height = 0.4)
 
 ```
+
+## Transmission Intensity
+
+### Within-Deme IBD vs COI
+- make point of generations
+
+## Isolation by Distance
+
+- do this with and w/out E 
+Barriers to gene flow
+
+## Meiotic siblings, Cousins, etc.
+- networks
+- remember to use weights 
+```{r}
+adj_graph <- ibd_long %>%
+  tidygraph::as_tbl_graph(., directed = F)
+
+ibd_long %>%
+  tidygraph::as_tbl_graph(., directed = F) %>%
+  dplyr::mutate(community = as.factor(tidygraph::group_louvain(weights = malecotf))) %>%
+  tidygraph::activate("edges") %>%
+  ggraph::ggraph(layout = 'kk') +
+  ggraph::geom_edge_link(aes(width = malecotf,
+                             color = malecotf)) +
+  ggraph::geom_node_point(aes(color = community),
+                          size = 3) +
+  ggraph::scale_edge_width_continuous(range = c(0, 1), guide = "none") +
+  ggraph::geom_node_text(aes(label = name), repel = T) +
+  ggraph::scale_edge_color_viridis("IBD", values = c(0,1), option = "plasma") +
+  scale_color_brewer(palette = "Set1") +
+  ggraph::theme_graph() +
+  theme(legend.position = "bottom")
+
+
+```
+
+## Self Exploration
+- shiny app 
+
+# Advanced/Extra
+- this section has resources and additional thoughts 
+
+## IBS & Polyclonality
+tessema & wesolowski 
+
+For polyclonal samples, IBS at a particular locus can be defined as, for a pair of samples, $X$ and $Y$, the total number of shared alleles $S_{i}$ across the two samples divided by all alleles at that locus for sample $X$, $X_{i}$ and all alleles at that locus for sample $Y$, $Y_{i}$. This can be summed across all loci to produce an overall estimate of IBS.
+
+$$IBS=  \frac{1}{n} \sum_{i=1}^{n} \frac{S_{i}} {X_{i}Y_{i}} $$
+
+<br> 
+<br> 
+
+## IBD & Polyclonality
+
+<br> 
+<br> 
+
+## Manipulating VCFs
+
+<br> 
+<br>
+
+## HMMs
+
+Hidden Markov models (HMMs) are a common statistical approach in population genetics, and for detecting IBD. For further reading, see [Rabiner 1989](https://web.mit.edu/6.435/www/Rabiner89.pdf). <br> <br>
+
+<br> 
+<br> 
+
+## Coalescent Model
+
+Coalescent theory is one of the central pillars of population genetics and provides a framework for how loci (genes, individuals, etc.) have been derived from a common ancestor backwards in time, classically using the assumptions of the Wright-Fisher model. One of the main assumptions of the coalescence, is that loci are independent and that no recombination is occurring between loci. To relax this assumption, we must consider the coalescence with recombination. In this framework, a single coalescent tree is no longer representative of the genome (*NB*: genomes are now combination of genes on intervals [0, L) ; [L, L\_{+1}], see [Griffiths & Marjoram 1996](http://lamastex.org/recomb/ima.pdf) for further details). As a result, each loci in the gene interval has a marginal tree due recombination resulting in different genealogical histories of loci. The collection of these trees with respect to recombination breakpoints among loci in the gene interval is termed the Ancestral Recombination Graph (ARG). Relatedness is considered as the time to most recent common ancestor (TMRCA) for a given loci and gives a more refined estimate of relatedness versus the binary distinction of whether or not a specific segment of the genome is IBD.
+
+<p align="center">
+
+![ARG for Three Samples with Two Discrete Loci](https://raw.githubusercontent.com/nickbrazeau/AMMS/master/R_ignore/images/arg.png){width="500px"}
+
+<br>
+
+For further reading, please refer to the following sources: [Wakeley: Coalescent Theory: An Introduction](https://www.amazon.com/Coalescent-Theory-Introduction-John-Wakeley/dp/0974707759)\
+[Li & Stephens: 2003 PSMC](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1462870/)\
+[Li & Durbin: 2011 PSMC](https://pubmed.ncbi.nlm.nih.gov/21753753/)
