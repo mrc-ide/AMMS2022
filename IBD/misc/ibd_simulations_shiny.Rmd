@@ -1,0 +1,386 @@
+---
+title: "Simulating IBD under a Simple Malaria Model"
+subtitle: "Spatial Structured Wright-Fisher Simulator"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+editor_options: 
+  chunk_output_type: console
+output: flexdashboard::flex_dashboard
+runtime: shiny
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F, fig.align = 'center', results = 'hide', fig.keep = 'all')
+remotes::install_github("nickbrazeau/polySimIBD", ref = "b01025d9b57d80cad0d972993486f74ddec680f3")
+library(polySimIBD)
+library(vcfR)
+library(tidyverse)
+library(cowplot)
+library(plotly)
+# https://rmarkdown.rstudio.com/flexdashboard/layouts.html#multiple_pages
+# https://shiny.rstudio.com/articles/shinyapps.html
+```
+
+
+
+```{r}
+# stochastic simulator for the unobserved state process --> how cases are generated
+seir_step <- function(S, E, I, R, N, Beta, mu_EI, mu_IR, delta.t){
+  dN_SE <- rbinom(n = 1, size = S, prob = 1 - exp(-Beta*(I/N)*delta.t))
+  dN_EI <- rbinom(n = 1, size = E, prob = 1 - exp(-mu_EI*delta.t))
+  dN_IR <- rbinom(n = 1, size = I, prob = 1 - exp(-mu_IR*delta.t))
+  S <- S - dN_SE
+  E <- E + dN_SE - dN_EI
+  I <- I + dN_EI - dN_IR
+  R <- R + dN_IR
+  return(c("S" = S, "E" = E, "I" = I, "R" = R))
+}
+
+# recursively just step through time now
+seir_wrapper <-  function(N, E0, I0, R0, Beta, mu_EI, mu_IR, time, ...){
+  # set up
+ S0 <- N - I0 - E0 - R0
+ time.steps <- (time - dplyr::lag(time))
+ # init 
+ ret <- matrix(NA, nrow = length(time.steps) , ncol = 4)
+ ret[1,] <- seir_step(S = S0, E = E0, 
+                      I = I0, R = R0, N = N, 
+                      Beta = Beta, 
+                      mu_EI = mu_EI, 
+                      mu_IR = mu_IR, delta.t = 0)
+ 
+ for (t in 2:length(time.steps)) {
+   ret[t,] <-  seir_step(S = ret[t-1, 1], 
+                         E = ret[t-1, 2], 
+                         I = ret[t-1, 3], 
+                         R = ret[t-1, 4], 
+                         N = N, # closed population
+                         Beta = Beta, 
+                         mu_EI = mu_EI, 
+                         mu_IR = mu_IR, 
+                         delta.t = time.steps[t]
+                         )
+ }
+ # out
+ ret <- cbind.data.frame(time, ret)
+ colnames(ret) <- c("time", "S", "E", "I", "R")
+ return(ret)
+ 
+}
+
+seir.odin <- odin::odin({
+  
+  # derivatives 
+  deriv(S) <- -beta * S * I / N 
+  deriv(E) <- beta * S * I / N - mu_EI * E
+  deriv(I) <- mu_EI * E - mu_IR * I
+  deriv(R) <- mu_IR * I
+  
+  # initial conditions
+  initial(S) <- N - I0
+  initial(E) <- E0
+  initial(I) <- I0
+  initial(R) <- R0
+  
+  I0 <- user(1) # note user allows you to vary if you want
+  N <- user(1e7)
+  E0 <- user(0)
+  R0 <- user(0)
+  
+  beta <- user(10)
+  mu_EI <- user(0.01)
+  mu_IR <- user(0.05)
+  
+})
+
+```
+
+
+Sidebar {.sidebar}
+=====================================
+
+```{r, results='asis'}
+#..............................................................
+# Sliding Panel for Different Parameters we are estimating
+#..............................................................
+
+inputPanel(
+      sliderInput("Time", label = "Time Observed Since Start of Epidemic",
+              min = 0, max = 1000, value = 200, step = 50),
+      
+      sliderInput("beta", label = "Beta (Effective Contact Rate)",
+              min = 0, max = 1, value = 0.5, step = 0.001),
+      
+      sliderInput("mu_EI", label = "EI (Rate of Infectiousness)",
+              min = 0, max = 0.5, value = 0.05, step = 0.005),
+      
+      sliderInput("mu_IR", label = "IR (Rate of Recovery)",
+              min = 0, max = 0.5, value = 0.02, step = 0.005),
+      
+      sliderInput("burnin", label = "Burn-In Iterations for MCMC",
+              min = 0, max = 5e3, value = 1e3, step = 500),
+      
+      sliderInput("sampling", label = "Sampling Iterations for MCMC",
+               min = 0, max = 5e3, value = 1e3, step = 500),
+      
+      sliderInput("chains", label = "Chains for MCMC",
+              min = 1, max = 5, value = 1, step = 1),
+      
+      sliderInput("rungs", label = "Rungs for Metropolic Coupling MCMC",
+              min = 0, max = 50, value = 1, step = 5),
+      
+      actionLink("button", "Ruh Roh!", icon("bug"), 
+             style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+   )
+
+
+
+
+```
+
+SEIR Plot
+=====================================  
+
+
+```{r, results='asis', fig.align='center', fig.height=40, fig.width=10}
+
+renderPlotly({ withProgress(message = 'Making plot', {
+  # re-render button
+  input$button
+  
+  #..............................................................
+  # truth
+  #..............................................................
+  # note, we have to work backwards to get E0
+  # because if one person is infected, that means people must be exposed
+  # back calculate with the fact that it took time to flow into E and out of E, so: 
+  truth <- seir_wrapper(N = 1e5,
+                        E0 = round(input$beta / (input$mu_EI + input$mu_IR)),
+                        I0 = 1,
+                        R0 = 0,
+                        Beta = input$beta,
+                        mu_EI = input$mu_EI,
+                        mu_IR = input$mu_IR,
+                        time = 1:input$Time)
+  
+  #..............................................................
+  # Plot Basic Plot
+  #..............................................................
+  truth %>% 
+    tidyr::gather(., key = "compartment", "count", 2:ncol(.)) %>% 
+    dplyr::mutate(Compartment = factor(compartment, levels = c("S", "E", "I", "R"))) %>% 
+    ggplot() + 
+    geom_line(aes(x=time, y=count, color = Compartment), size = 2, alpha = 0.9) +
+    scale_color_manual("", values = c( "#4daf4a", "#377eb8", "#e41a1c", "#984ea3")) +
+    xlab("Time") + ylab("N") +
+    theme_bw() +
+    theme(
+      axis.title = element_text(family = "Helvetica", face = "bold", vjust = 0.5, size = 15),
+      axis.text = element_text(family = "Helvetica", hjust = 0.5, vjust = 0.5, size = 14),
+      legend.title = element_text(family = "Helvetica", face = "bold", vjust = 0.5, size = 15),
+      legend.text = element_text(family = "Helvetica", hjust = 0.5, vjust = 0.5, size = 14),
+      panel.background = element_blank(),
+      plot.background = element_rect(fill = "transparent"),
+      legend.background = element_rect(fill = "transparent")) 
+  
+}) # end of progress bar
+  
+})
+
+
+```
+
+SEIR Inference 
+=====================================  
+
+
+```{r, results='asis', fig.align='center', fig.height=40, fig.width=10}
+
+renderPlot({ withProgress(message = 'Making plot', {
+  input$button
+  #..............................................................
+  # truth
+  #..............................................................
+  # note, we have to work backwards to get E0
+  # because if one person is infected, that means people must be exposed
+  # R0 is Ce/D, so we can back calculate here: 
+  truth <- seir_wrapper(N = 1e5,
+                        E0 = round(input$beta / (input$mu_EI + input$mu_IR)),
+                        I0 = 1,
+                        R0 = 0,
+                        Beta = input$beta,
+                        mu_EI = input$mu_EI,
+                        mu_IR = input$mu_IR,
+                        time = 1:input$Time)
+  
+  #..............................................................
+  # set up odin for Dr. Jacoby
+  #..............................................................
+  mod <- seir.odin(
+  beta = input$beta,
+  mu_EI = input$mu_EI,
+  mu_IR = input$mu_IR,
+  N = 1e5,
+  I0 = 1,
+  E0 = 0,
+  R0 = 0)
+
+
+  
+  #..............................................................
+  # Run MCMC
+  #..............................................................
+  # We don't see full curve -- only see infxns.
+  obs.data <- data.frame(time = truth$time, 
+                         infxns = truth$I)
+  
+    
+    # https://mrc-ide.github.io/drjacoby/articles/example.html
+    devtools::install_github("mrc-ide/drjacoby", ref = "3e915113ea960e09a4b30eb9e661331ab66da020")
+    library(drjacoby)
+    #..............................................................
+    # Set up Dr. Jacoby
+    #..............................................................
+    
+    # let's assume that the true number of infections in our population can be
+    # modeled through the parameter p, which reflects a combination of 
+    # sampling efficiency and the detectability of infections
+    
+    r_loglike <- function(params, param_i, data, misc){
+      mod <- seir.odin(
+        beta = params[1],
+        mu_EI = params[2],
+        mu_IR = params[3],
+        N = 1e5,
+        I0 = 1,
+        E0 = 0,
+        R0 = 0
+      )
+      modrun <- mod$run(1:input$Time) # assume time is fixed
+      I <- modrun[, "I"]
+      I[I < 0] <- .Machine$double.xmin # catch
+      ret <- dpois(data$obs.data, lambda = I, log = T)
+      ret <- sum(ret)
+      return(ret)
+    }
+    
+    # define log-prior function
+    r_logprior <- function(params, param_i, misc) {
+      # extract parameter values
+      beta = params[1]
+      mu_EI = params[2]
+      mu_IR = params[3]
+      
+      # calculate prior
+      ret <- dunif(beta, min = 0, max = 1, log = TRUE) 
+      dunif(mu_EI, min = 0, max = 1, log = TRUE) +
+        dunif(mu_IR, min = 0, max = 1, log = TRUE) 
+      
+      # return
+      return(ret)
+    }
+    
+    # define parameters dataframe
+    df_params <- data.frame(name = c("beta", "mu_EI", "mu_IR"),
+                            min = c(0, 0.001, 0.001),
+                            max = c(1, 1, 1),
+                            init = c(0.5, 0.05, 0.05))
+    
+    
+    data_list <- list(obs.data = obs.data$infxns)
+    # run MCMC
+    r_mcmc_out <- run_mcmc(data = data_list,
+                           df_params = df_params,
+                           loglike = r_loglike,
+                           logprior = r_logprior,
+                           misc = list(foo = 99),
+                           burnin = input$burnin,
+                           samples = input$sampling,
+                           chains = input$chains,
+                           rungs = input$rungs, 
+                           GTI_pow = 3.0,
+                           pb_markdown = TRUE)
+    
+    #..............................................................
+    # plot MCMC outs
+    #..............................................................
+    beta.post.plot <- plot_par(r_mcmc_out, show = "beta", phase = "sampling", display = F)
+    b2 <- beta.post.plot$Plot_beta[[2]] + 
+    theme_minimal() +
+    theme(
+      plot.title = element_text(family = "Helvetica", face = "bold", vjust = 0.5,  hjust = 0.5, size = 22),
+      axis.title = element_text(family = "Helvetica", face = "bold", hjust = 0.5, vjust = 0.5, size = 18),
+      axis.text = element_text(family = "Helvetica", hjust = 0.5, vjust = 0.5, size = 17),
+      panel.background = element_blank(),
+      plot.background = element_blank(),
+      axis.line = element_line(color = "#000000", size = 1.2),
+      legend.position = "none") 
+    
+    b1 <- beta.post.plot$Plot_beta[[1]] + 
+    theme_minimal() +
+    theme(
+      plot.title = element_text(family = "Helvetica", face = "bold", vjust = 0.5,  hjust = 0.5, size = 22),
+      axis.title = element_text(family = "Helvetica", face = "bold", hjust = 0.5, vjust = 0.5, size = 18),
+      axis.text = element_text(family = "Helvetica", hjust = 0.5, vjust = 0.5, size = 17),
+      panel.background = element_blank(),
+      plot.background = element_blank(),
+      axis.line = element_line(color = "#000000", size = 1.2),
+      legend.position = "none") 
+    
+    mu_EI.post.plot <- plot_par(r_mcmc_out, show = "mu_EI", phase = "sampling", display = F)
+    e2 <- mu_EI.post.plot$Plot_mu_EI[[2]] + 
+    theme_minimal() +
+    theme(
+      plot.title = element_text(family = "Helvetica", face = "bold", vjust = 0.5,  hjust = 0.5, size = 22),
+      axis.title = element_text(family = "Helvetica", face = "bold", hjust = 0.5, vjust = 0.5, size = 18),
+      axis.text = element_text(family = "Helvetica", hjust = 0.5, vjust = 0.5, size = 17),
+      panel.background = element_blank(),
+      plot.background = element_blank(),
+      axis.line = element_line(color = "#000000", size = 1.2),
+      legend.position = "none") 
+    e1 <- mu_EI.post.plot$Plot_mu_EI[[1]] + 
+    theme_minimal() +
+    theme(
+      plot.title = element_text(family = "Helvetica", face = "bold", vjust = 0.5,  hjust = 0.5, size = 22),
+      axis.title = element_text(family = "Helvetica", face = "bold", hjust = 0.5, vjust = 0.5, size = 18),
+      axis.text = element_text(family = "Helvetica", hjust = 0.5, vjust = 0.5, size = 17),
+      panel.background = element_blank(),
+      plot.background = element_blank(),
+      axis.line = element_line(color = "#000000", size = 1.2),
+      legend.position = "none") 
+    
+    mu_IR.post.plot <- plot_par(r_mcmc_out, show = "mu_IR", phase = "sampling", display = F)
+    i2 <- mu_IR.post.plot$Plot_mu_IR[[2]] + 
+    theme_minimal() +
+    theme(
+      plot.title = element_text(family = "Helvetica", face = "bold", vjust = 0.5,  hjust = 0.5, size = 22),
+      axis.title = element_text(family = "Helvetica", face = "bold", hjust = 0.5, vjust = 0.5, size = 18),
+      axis.text = element_text(family = "Helvetica", hjust = 0.5, vjust = 0.5, size = 17),
+      panel.background = element_blank(),
+      plot.background = element_blank(),
+      axis.line = element_line(color = "#000000", size = 1.2),
+      legend.position = "none") 
+    i1 <- mu_IR.post.plot$Plot_mu_IR[[1]] + 
+    theme_minimal() +
+    theme(
+      plot.title = element_text(family = "Helvetica", face = "bold", vjust = 0.5,  hjust = 0.5, size = 22),
+      axis.title = element_text(family = "Helvetica", face = "bold", hjust = 0.5, vjust = 0.5, size = 18),
+      axis.text = element_text(family = "Helvetica", hjust = 0.5, vjust = 0.5, size = 17),
+      panel.background = element_blank(),
+      plot.background = element_blank(),
+      axis.line = element_line(color = "#000000", size = 1.2),
+      legend.position = "none") 
+    
+    
+    #..............................................................
+    # Final plots out
+    #..............................................................
+   cowplot::plot_grid(b1, b2, e1, e2, i1, i2, nrow = 3, ncol = 2)
+  
+}) # end of progress bar
+  
+})
+
+
+
+```
