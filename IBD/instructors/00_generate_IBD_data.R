@@ -25,11 +25,11 @@ dwnsmpl <- sort(unlist(lapply(dwnsmpl, function(x,ds)sample((x-ds):x, size = 5),
 coimeans <- c(4, 1.5, 2.75, 1.25, 1)
 m <- rep(0.25, 5)
 # make symmetrical
-migr_dist_mat <- matrix(c(1,20,20,30,0,
-                          20,1,15,30,0,
-                          20,20,1,2,0,
-                          30,30,2,1,0,
-                          0,0,0,0,1),
+migr_dist_mat <- matrix(c(100,20,20,30,0,
+                          20,100,15,30,0,
+                          20,20,100,2,0,
+                          30,30,2,100,0,
+                          0,0,0,0,100),
                         ncol = 5, nrow = 5)
 swfsim <- polySimIBD::sim_swf(pos = sort(sample(1:1e3, size = 50)),
                               N = demesizes,
@@ -40,7 +40,7 @@ swfsim <- polySimIBD::sim_swf(pos = sort(sample(1:1e3, size = 50)),
                               tlim = 10)
 
 #......................
-# lif over into VCF
+# lift over into VCF
 #......................
 # get arg
 ARG <- polySimIBD::get_arg(swfsim, host_index = dwnsmpl)
@@ -122,11 +122,8 @@ ibd <- MIPanalyzer::inbreeding_mle(x = mipvcf,
 diag(ibd$mle) <- 1
 colnames(ibd$mle) <- rownames(ibd$mle) <- colnames(simVCF@gt)[2:ncol(simVCF@gt)]
 
-ibd_long <- broom::tidy(as.dist(t(ibd$mle))) %>%  # note, Bob returns upper triangle
+ibd_long <- broom::tidy(as.dist(t(ibd$mle))) %>%  # note, returns upper triangle
   magrittr::set_colnames(c("p1", "p2", "malecotf"))
-
-# save out in case future problems for participants
-saveRDS(object = ibd_long, file = "results/ibd_long_verity_mle.rds")
 
 
 # see if connections are as expected
