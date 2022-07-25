@@ -10,7 +10,7 @@
 **Sophie Berube**: words  
 <br>
 <br>
- <img align="left" src="https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/NFB_Professional_ChimpPic.jpg" width="150" />
+ <img align="left" src="https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/NFB_Professional_ChimpPic.jpg" width="100" />
 **Nick Brazeau**: Infectious disease epidemiologist, student physician, lover of coffee
 <br>
 <br>

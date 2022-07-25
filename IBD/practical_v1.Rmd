@@ -3,16 +3,19 @@ title: "AMMS IBS & IBD Practical"
 author: "Nick Brazeau, Sophie Berube, Izzy Routledge, Abebe Fola"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
+  word_document:
+    toc: yes
+    toc_depth: '2'
   html_document:
     theme: readable
     highlight: tango
     code_folding: hide
     toc: yes
     toc_float:
-      collapsed: false
-      smooth_scroll: false
+      collapsed: no
+      smooth_scroll: no
     toc_depth: 2
-    number_sections: true
+    number_sections: yes
 editor_options:
   chunk_output_type: console
 ---
@@ -157,6 +160,22 @@ _**Conceptual Question:** Are biallelic markers (genotypic positions with two al
 <br>
 _**Answer:** Multiallelic has more information_
 
+### IBD Programs {.unnumbered}
+<!-- https://www.tablesgenerator.com/markdown_tables -->
+Below is a table of pros-cons-details of various IBD programs specified for malaria that have been peer-reviewed as of August 5, 2022. 
+<br>
+
+
+| **Program** 	| **Pros** 	| **Cons** 	| **Details** 	|
+|---	|---	|---	|---	|
+| [Inbreeding estimation](https://pubmed.ncbi.nlm.nih.gov/32355199/) 	| + Fast 	| + Assumes independent loci 	|  Model is not considering recombination blocks (backbone of IBD) 	|
+| [hmmIBD](https://github.com/glipsnort/hmmIBD) 	| + Fast <br><br>+ Easy to use <br><br>+ Statistically robust <br><br>+ Foundational program for malaria ibd <br> 	| + Specified for monoclonals 	|  Users can use in polyclonal samples, but is misspecified under model and results are typically conservative estimates of IBD 	|
+| [isoRelate](https://github.com/bahlolab/isoRelate) 	| + Statistically robust <br><br>+ Handles polyclonals <br><br>+ Statistical testing for "important" loci <br> 	| + Can become computationally intensive  	|  Model assumes a "diploid" state for COI > 1, and thus makes a simplifying assumption about polyclonality 	|
+| [DeploidIBD](https://github.com/DEploid-dev/DEploid) 	| + Statistically robust <br><br>+ Handles polyclonals <br><br>+ Phased sample results <br><br>+ Within-sample estimates of IBD <br> 	| + Computationally intensive 	| Model phases polyclonal samples into monoclonal samples (_i.e._ a sample with COI = 2 becomes two new phased strains: smpl1.1, smpl1.2). As part of phasing, program provides within-sample IBD. From phased sample results, users can use any existing IBD program (`hmmIBD`, `refinedIBD`, etc). Program's primary goal is phasing with within-IBD estimates provided as a "bonus". 	|
+
+
+<br>
+<br>
 # Overview of Data {.unnumbered}
 This data was simulated using a simple malaria model that takes into account spatial relationships, complexity of infection (COI), and population size under a Wright-Fisher model: [PolySimIBD](https://github.com/nickbrazeau/polySimIBD). Later, you will have an opportunity to interact with this simulator to further refine your intuition for IBS/IBD in the _Self Exploration_ section.
 <br>
