@@ -1,0 +1,420 @@
+---
+title: "AMMS COI Practical"
+author: "Jason Hendry, Nick Brazeau"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  word_document:
+    toc: yes
+    toc_depth: '2'
+  html_document:
+    theme: readable
+    highlight: tango
+    code_folding: hide
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+    toc_depth: 2
+    number_sections: yes
+editor_options:
+  chunk_output_type: console
+---
+
+# Acknowledgements {.unnumbered}
+Sincere thanks to Sophie Berube, Isobel Routledge, Rohan Arambepola, and Amy Wesolowski for contributions and prior practical materials. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F, 
+                      fig.align = 'center', fig.keep = 'all')
+```
+
+<!-- Here we style out button a little bit -->
+
+```{=html}
+<style>
+.showopt {
+background-color: #004c93;
+color: #FFFFFF; 
+width: 100px;
+height: 20px;
+text-align: center;
+vertical-align: middle !important;
+border-radius: 8px;
+float:right;
+}
+
+.showopt:hover {
+background-color: #dfe4f2;
+color: #004c93;
+}
+
+</style>
+```
+<!--Include script for hiding output chunks-->
+
+```{=html}
+<script src="misc/hideOutput.js"></script>
+```
+# Dependencies for Practical {.unnumbered}
+
+Please copy and paste the below code chunk in it's entirety to your console to download R package libraries needed for this practical. If you are having trouble installing any of the R packages, please ask an instructor for a pre-loaded flash drive.
+
+```{r, echo=T}
+deps <- c("tidyverse", "vcfR", "McCOILR")
+deps <- !sapply(deps, function(x){x %in% installed.packages()[,1]} )
+if(any(deps)) {
+  if(deps["McCOILR"]) {
+    if (!"remotes" %in% installed.packages()[,1]){
+      install.packages("remotes")
+    }
+    remotes::install_github("OJWatson/McCOILR")
+    deps <- deps[names(deps) != "McCOILR"]
+  } else {
+    install.packages(names(deps)[deps])
+  }
+}
+
+
+```
+
+Please now load all of those libraries into this session using the code chunk below. Please copy and paste it in its entirety.
+
+```{r, echo=T}
+library(tidyverse)
+library(vcfR)
+library(McCOILR)
+```
+
+Please set *your* working director so that you are in the `AMMS/COI` directory. If you are having trouble finding that path, you can use the `file.choose` function to help determine its location. 
+
+# Introduction {.unnumbered}
+## Useful Definitions {.unnumbered}
+_**Definition:** An allele is the identity of a particular genetic locus or sequence that is inherited between parents and offspring._
+_**Definition:** A locus is a fixed position on a chromosome where a particular genetic marker is located._
+_**Definition:** Sequencing data consists of sequences of DNA obtained from a DNA sequencing reaction_
+_**Definition:** Complexity of infection, or multiplicity of infection, is a measure of the number of different malaria parasite clones in an individual sample._
+_**Definition:** A monoclonal malaria infection contains one parasite strain, or "genome" (complexity of infection [COI] = 1), while a polyclonal infection contains more than one parasite strain (COI > 1)._
+_**Definition**: Population Level Heterozygosity or Expected Heterozygosity ($H_E$): is a measure of the genetic diversity of the different clones in a population, at a particular genetic locus._
+
+## COI Review {.unnumbered}
+Complexity of infection (also know as multiplicity of infection) is the number of distinct clones, or parasite strains, that are within an individual. If there is only a single clone, the host is assumed to have a monoclonal infection. If there are more than one clones, or parasite strains, the host is assumed to have a polyclonal infection. Polyclonal infections result through two pathways: (1) superinfection and (2) contransmission. _Superinfection_ occurs when an individual is bit by multiple mosquitoes, each carrying distinct clones. _Cotransmission_ occurs when a single mosquito is carrying more than one clone and bites, and transmits, multiple clones to the individual concurrently.    
+<br>
+There are serveral motheds for calculating COI, that are all built on the premise that distinct alleles indciate different clones: 
+
+1. COI $=$ maximum number of alleles present at any genotyped locus in a sample. 
+
+2. COI $=$ the second highest number of alleles present at any genotyped locus in a sample. This is done to address the possibility of false positives in detecting alleles (sequencing error being interpreted as a "new" or "distinct" clone).  
+
+3. COI can also be statisitically estimated using tools which account for parasites sharing the same allele or that an allele present may not be detected (a false negative), resulting in underestimates, and that a false positive allele may be detected, resulting in over estimates. Software exists for calculating this from binary SNP data (THE REAL McCOIL, Chang et al, 2017) 
+
+
+# Practical Goals {.unnumbered}
+
+By the end of this practical, you should understand the following concepts:  
++ Malaria infections can either be monoclonal (single strain within host) or polyclonal (multiple strains within host)
++ Complexity of infection (COI) is a measure of the number of strains: in a monoclonal infection COI = 1; in a polyclonal infection COI > 1
++ In theory, COI is closely associated with transmission intenisty; in reality, COI is a crude measure of transmission intensity 
+
+------------------------------------------------------------------------
+
+# Importing Data
+
+Here, we will use the `vcfR` [package](https://knausb.github.io/vcfR_documentation/) to read in our variant call file (VCF) that contains biallelic SNPs for our *** individuals across our two populations.
+
+```{r}
+DRCongo <- vcfR::read.vcfR("data/SNPs.DRCongo.setB.random96.vcf")
+#Vietnam <- vcfR::read.vcfR("data/SNPs.Vietnam.setD.random96.vcf")
+```
+
+## Munging & Extracting Genomic Data for DRC
+*** break down the block into more details 
+
+- going to go from wide to long for ease 
+```{r}
+# extract information
+# loci <- vcfR::extract_info_tidy(DRCongo)
+#TODO Jason *** - above throws an error, it shouldn't unless vcf is misbehaving. haven't dug in. longer approach below
+
+loci <- DRCongo@fix[,1:2] %>% 
+  tibble::as_tibble() %>% 
+  dplyr::mutate(POS = as.numeric(POS),
+                Key = 1:dplyr::n()) %>% 
+  dplyr::select(c("CHROM", "POS", "Key"))
+
+
+# extract GT information and get WSRAF for every sample at each loci
+DRCongo_long <- DRCongo %>% 
+  vcfR::extract_gt_tidy() %>% 
+  # lets make some new variables
+  dplyr::mutate(
+    # need to change the GT character to a numeric for maths
+    gt = dplyr::case_when(gt_GT == "0/0" ~ 0,
+                          gt_GT == "0/1" ~ 0.5,
+                          gt_GT == "1/1" ~ 1), 
+    # get reference allele depth
+    rad = purrr::map_dbl(gt_AD, function(x){vcfR::masplit(
+      as.matrix(x), record = 1, sort = FALSE, decreasing = FALSE)}),
+    # get alternate allele depth 
+    aad = purrr::map_dbl(gt_AD, function(x){vcfR::masplit(
+      as.matrix(x), record = 2, sort = FALSE, decreasing = FALSE)}),
+    # calculate within-sample reference allele freq
+    wsraf = rad/(rad + aad),
+    wsraf = ifelse(is.nan(wsraf), NA, wsraf) # occurs when 0/0
+    ) %>% 
+  # now let's select the variables that we want
+  dplyr::select(c("Key", "Indiv", "gt", "wsraf")) %>% 
+  # now lets combine the loci information with the individual level information
+  dplyr::full_join(x = loci, y = ., by  = "Key") %>% 
+  # don't need Key anymore
+  dplyr::select(-c("Key"))
+
+```
+
+### Look at VCF in "long" format 
+Each of these columns *** 
+```{r}
+head(DRCongo_long)
+```
+
+
+
+# Population Level Allele Frequencies
+Now we will calculate the PLAF by ***
+
+```{r}
+DRC_plaf <- DRCongo_long %>% 
+  dplyr::group_by(CHROM, POS) %>% 
+  dplyr::summarise(
+    # multiple by 2 to assume diploid genome
+    PLAF = sum(gt * 2, na.rm = T) / (2* sum(!is.na(gt))) 
+  )
+
+```
+
+### Visualizing PLAF
+
+```{r}
+DRC_plaf %>% 
+  ggplot() + 
+  geom_histogram(aes(x = PLAF))
+```
+
+
+
+
+# Population Heterozygosity 
+How diverse population is *** 
+We can calculate expected heterozygosizy or population level heterozygosity of a particular locus with the following equation: 
+
+$$H_E= \left(\frac{n}{n-1}\right) \times \left(1-\sum_{i}p_i^2\right)$$
+where $n$ is the number of genotyped samples in our population of interest, and $p_i$ is the frequency of the $i^{th}$ allele in the population at a particular locus. The value of $H_E$ is between 0 and 1, with values close to 0 representing low genetic diversity and values close to 1 representing high genetic diversity. 
+
+**Question:** What relationship would we expect between population-level heterozygosity and transmission intensity?
+
+**Answer:** _We would expect higher population level heterozygosity in high transmission settings._  
+
+# Individual Heterozygosity
+How diverse individual is ***
+
+## Exploring WSAF
+***
+```{r}
+# pick five individuals
+fivefriends <- DRCongo_long$Indiv[1:5]
+DRCongo_long %>% 
+  dplyr::filter(Indiv %in% fivefriends) %>% 
+  ggplot() + 
+  geom_histogram(aes(x = wsraf)) +
+  facet_wrap(~Indiv)
+
+#TODO - have participants explore wsraf vs COI call? 
+```
+
+
+### Comparing PLAF vs mean WSAFs
+- Linear -- not at all surprising
+- Both PLAF and mean WSAF per-site driven by # samples not REF
+***
+
+```{r}
+
+DRCongo_long %>% 
+  dplyr::group_by(CHROM, POS) %>% 
+  dplyr::summarise(meanWSRAF = mean(wsraf, rm.na = T)) %>% 
+  dplyr::full_join(DRC_plaf, ., by = c("CHROM", "POS")) %>% 
+  ggplot() + 
+  geom_point(aes(x = PLAF, y = meanWSRAF))
+
+```
+
+### Compute heterozygosities
+***
+```{r}
+calc_biallelic_heterozygosity <- function(p_alt) {
+  return (p_alt * (1 - p_alt))
+}
+
+# calculate het for samples
+DRCongo_long <- DRCongo_long %>% 
+  dplyr::mutate(
+    het_wsafs = purrr::map_dbl(wsraf, calc_biallelic_heterozygosity)
+  )
+
+
+
+```
+
+### Visualize Heterozygosity
+***
+```{r}
+DRCongo_fws %>% 
+  ggplot() + 
+  geom_histogram(aes(x = fws))
+
+```
+
+
+# Within-Host Diversity
+_**Definition:**_ $F_{ws}$ _is a measure of the within-host diversity of an individual infection relative to the population level genetic diversity. _
+
+A high $F_{ws}$ indicates low within-host diversity relative to the population. A low $F_{ws}$ indicates a high within-host diversity relative to the population. 
+
+ $F_{ws}$ is calculated using the following equation: 
+ $$F_{ws} =1−H_w/H_s$$
+Where $H_w$ is the heterozygosity of the individual and $H_s$ is the heterozygosity of the local parasite population.
+
+High values of $F_{ws}$ suggest low within host diversity relative to the population's diversity. Low values of $F_{ws}$ suggest high within host diversity relative to the population's diversity. It is common to calculate a similar value, $1-F_{ws}$ so that there is a positive 
+relationship between the value and within host diversity: 
+$$1-F_{ws}= 1-\left(1-\frac{H_w}{H_s}\right) = \frac{H_w}{H_s}$$
+
+$1-F_{ws}$ has the opposite relationship to within host diversity relative to the population's diversity. High values of $1-F_{ws}$ suggest high within host diversity relative to the population's diversity. Low values of $1-F_{ws}$ suggest low within host diversity relative to the population's diversity. 
+
+In higher transmission areas, individuals are more likely to be be infected by multiple clones and therefore the within-host diversity of samples from this area is likely to be higher, and so $1-F_{ws}$ is likely to be higher. In contrast, individuals in low transmission regions are more likely to have monoclonal infections or polyclonal infections with lower COI and therefore within-host diversity is likely to be lower. This metric is closely related to COI. 
+
+```{r}
+# calculate het for pop
+DRC_plaf <- DRC_plaf %>% 
+  dplyr::mutate(
+    het_plaf = purrr::map_dbl(PLAF, calc_biallelic_heterozygosity)
+  )
+
+# now calculate fws
+DRCongo_fws <- dplyr::full_join(DRCongo_long, DRC_plaf, by = "CHROM", "POS") %>% 
+  dplyr::group_by(Indiv) %>% 
+  dplyr::summarise(
+    fws = mean( 1 - het_wsafs / het_plaf, na.rm = T)
+  )
+
+
+```
+
+
+
+# Calculating COI
+***
+
+## Reformatting data for RMCL
+***
+```{r}
+# wide format 
+DRCongo_RMCL <- DRCongo_long %>% 
+  dplyr::mutate(loci = paste(CHROM, POS, sep = "|")) %>% 
+  dplyr::select(c("loci", "Indiv", "gt")) %>% 
+  # liftover missing for RMCL 
+  dplyr::mutate(gt = ifelse(is.na(gt), -1, gt)) %>% 
+  tidyr::pivot_wider(names_from = "Indiv",
+                     values_from = "gt")
+# make matrix and format for RMCL
+DRCongo_RMCLmat <- as.matrix(DRCongo_RMCL[2:ncol(as.matrix(DRCongo_RMCL))])
+rownames(DRCongo_RMCLmat) <- DRCongo_RMCL[["loci"]]
+DRCongo_RMCLmat <- t(DRCongo_RMCLmat)
+# make list of multiple SNP sets
+gts_rmcl <- list("DRCsetA" = DRCongo_RMCLmat)
+
+```
+
+## Running RMCL
+***
+Do this into the /COI directory
+`git clone https://github.com/EPPIcenter/THEREALMcCOIL.git`
+Also see: https://github.com/EPPIcenter/THEREALMcCOIL/tree/master/categorical_method
+
+```{r}
+# Prepare output directory
+output_dir <- "results"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
+out_cat <- McCOIL_categorical(gts_rmcl[["DRCsetA"]],
+                              maxCOI=25, threshold_ind=20,
+                              threshold_site=20,
+                              totalrun=1000, burnin=100, M0=15,
+                              e1=0.05, e2=0.05,
+                              err_method=3, 
+                              path="results",
+                              output="output_DRCsetA.txt" )
+
+
+```
+
+## Exploring THEREALMcCOIL outputs
+***
+```{r}
+# Load summary data
+DRCongo_COI <- readr::read_table("results/output_DRCsetA.txt_summary.txt") %>% 
+  # Subset to COI results
+  dplyr::filter(CorP == "C") %>% 
+  # select to rows we care about
+  dplyr::select(-c("file", "CorP")) %>% 
+  dplyr::rename(Indiv = name)
+
+# Compute fraction mixed
+DRCongo_COI %>% 
+  dplyr::summarise(frac_mixed = sum(mean > 1) / dplyr::n()) 
+  
+# What does the distribution look like?
+DRCongo_COI %>% 
+  ggplot() + 
+  geom_histogram(aes(x = mean))
+  
+#TODO boxplots
+
+```
+
+**Question:** What is the relationship between COI and transmission intensity?
+
+**Answer:** _Generally, high transmission regions have higher average COI among samples and low transmission regions have lower average COI among samples. However, in very low transmission settings where many detected cases are imported, the average COI may be more of a reflection of diversity in the areas where the imported cases originated than diversity of locally aquired cases._ 
+
+**Question:** Why do you think there is this relationship?
+
+**Answer:** _In high transmission settings, people often get many infectious mosquito bites fairly regularly, in other words they get re-infected with parasites in rapid succession. This, combined with the fact that many people harboring parasites in high transmission settings are asymptomatic (without symptoms), making them unlikely to get treatment for malaria and thus get rid of these parasites, means that people tend to accumulate high numbers of parasites in high transmission settings. There also tends to be a high genetic diversity of parasites in regions with high transmission (which will be discussed further later in this activity), therefore the chance that the parasites a person might accumulate are genetically distinct clones is higher. This means that a person in a high transmission region is likely to have many genetically distinct parasites at one time, giving them a high COI._ 
+
+
+We can now compare COIs across the four sampled regions in Namibia and relate COI to transmission intensity. 
+
+
+# COI vs Heterozygosity Relationships
+***
+```{r}
+# now combine for a final dataframe
+DRCongo_final <- DRCongo_long %>% 
+  dplyr::left_join(., DRCongo_COI, by = "Indiv") %>% 
+  dplyr::left_join(., DRCongo_fws, by = "Indiv")
+
+# plot
+DRCongo_final %>% 
+  dplyr::mutate(mean_char = as.factor(mean)) %>% 
+  ggplot() + 
+  geom_boxplot(aes(x = mean_char, y = fws))
+
+#TODO more relationships
+```
+
+
+
+# Advanced/Extra
+This section contains additional questions and resources for interested participants. 
+
+- power 
+- two data sets w/ higher COI --> can you do a significance test to detect whether COI has decreased 
+what is the appropriate test --> t test? --> find the text statistic in R and then have them calculate it for real on the console 
