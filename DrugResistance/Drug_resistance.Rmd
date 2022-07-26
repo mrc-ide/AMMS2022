@@ -21,22 +21,92 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+# Dependencies for Practical {-}
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+Please copy and paste the below code chunk in it's entirety to your console to download R package libraries needed for this practical. If you are having trouble installing any of the R packages, please ask an instructor for a pre-loaded flash drive.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r, class.source = "fold-show"}
+if (!("tidyverse" %in% installed.packages())) {
+  install.packages("tidyverse",dependencies=T) 
+  # will need sudo apt-get install -y libxml2-dev libcurl4-openssl-dev libssl-dev
+}
 ```
 
-## Including Plots
+Now load all of those libraries into this session using the code chunk below. Please copy and paste it in its entirety.
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r, class.source = "fold-show"}
+library(tidyverse)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+### Drug resistance data {-}
+
+In this practical we will get familiar with genetic data using a drug resistance dataset to estimate prevalence. 
+
+### Practical Goals
+By the end of this practical, you should be able to:
+- Import data to RStudio
+- Construct a 95% confidence interval
+- Visualize drug resistance 
+- Interpret something
+
+## Load data
+```{r}
+dr.data <- readRDS("outputs/DRC_DR1.rds")
+```
+
+# Getting familiar with data
+What are the columns named in dr.data? 
+How many columns are there in dr.data?
+How many rows are there in dr.data?
+
+```{r}
+colnames(dr.data)
+ncol(dr.data) # or length(colnames(dr.data))
+nrow(dr.data)
+```
+
+
+# Summarize data
+
+How many total samples are there?
+How many codons are we looking at?
+How many samples per province are there?
+
+
+
+```{r}
+
+samples <- unique(dr.data$SAMPLE_ID)
+
+length(samples)
+
+codons <- dr.data %>% 
+  select(GENE_NAME,CODON_NUM) %>% 
+  distinct()
+
+codons
+
+nrow(codons)
+
+dr.data.per.province <- dr.data %>% 
+  select(SAMPLE_ID,PROVINCE) %>% 
+  distinct() %>% 
+  group_by(PROVINCE) %>% 
+  summarise(n = n())
+
+View(dr.data.per.province)
+```
+
+
+# Estimate prevalence
+
+
+
+
+# Construct CIs based on Wald's interval formula
+
+# Estimate CI using eppitools
+
+# Plot DR combinations using UpSet
+
