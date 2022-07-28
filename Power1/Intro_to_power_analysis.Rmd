@@ -22,29 +22,6 @@ knitr::opts_chunk$set(echo = T, warning = F, message = F,
                       fig.align = 'center', fig.keep = 'all')
 ```
 
-<!-- Here we style out button a little bit -->
-
-```{=html}
-<style>
-.showopt {
-background-color: #004c93;
-color: #FFFFFF; 
-width: 100px;
-height: 20px;
-text-align: center;
-vertical-align: middle !important;
-border-radius: 8px;
-float:right;
-}
-
-.showopt:hover {
-background-color: #dfe4f2;
-color: #004c93;
-}
-
-</style>
-```
-
 
 # Dependencies for Practical {-}
 
@@ -78,11 +55,11 @@ Very often in molecular surveillance we are interested in answering simple and w
 
 We could simply measure these quantities and report our results, which is sometimes called **descriptive statistics**, but often we want more than this. We want to be able to "prove" that an effect is real. This means accounting for the role of chance in our results through **statistical testing**, sometimes called **null hypothesis testing**. If our observed results are very unlikely to happen by chance alone then it gives us more confidence that an effect is real. This does not quite "prove" that the effect is real, as we could always have been very lucky or unlucky, but it does at least control how often we come to the wrong conclusion.
 
-Once we have a firm handle on statistical testing, the next crucial idea to grasp is **statistical power**. We can think of **power analysis** as a sort of statistical testing that we do before seeing any data. Instead, we make assumptions about the strength of the effect in the real world (for example, the difference in drug resistance prevalence) and  our sample size, and we calculate *exactly* how likely we are to detect this real effect with our chosen significance test. If power is low then we are likely to miss interesting results even if they are there, because our statistical test cannot rule out the possibility that our results are down to pure chance. It is therefore critically important that we carry out power analysis before undertaking any serious trial or survey to ensure that have a decent chance of success. 
+Once we have a firm handle on statistical testing, the next crucial idea to grasp is **statistical power**. We can think of **power analysis** as a sort of statistical testing that we do before seeing any data. Instead, we make assumptions about the strength of the effect in the real world (for example, the difference in drug resistance prevalence) and  our sample size, and we calculate *exactly* how likely we are to detect this real effect with our chosen significance test. If power is low then we are likely to miss interesting results even if they are there, because our statistical test cannot rule out the possibility that our results are down to pure chance. It is therefore critically important that we carry out power analysis before undertaking any serious trial or survey to ensure that we have a decent chance of success. 
 
 ### Overview of Data {-}
 
-For this practical we will work entirely with made-up datasets. These will allow us to get to grips with the basic concepts, which we can then apply to real datasets at a later stage.
+For this practical we will work entirely with made-up, or simulated, datasets. These will allow us to get to grips with the basic concepts, which we can then apply to real-world datasets at a later stage.
 
 ### Practical Goals {-}
 
@@ -135,12 +112,16 @@ We can see that we have only 10 samples from each population, and it's difficult
 # get mean and variance of control population
 mean(COI_control)
 var(COI_control)
+```
+`r end_button()`
+`r hrule()`
 
+`r begin_button(1)`
+```{r, results='hold', class.source = "fold-show"}
 # get mean and variance of bednets population
 mean(COI_nets)
 var(COI_nets)
 ```
-
 `r end_button()`
 `r hrule()`
 
@@ -171,7 +152,7 @@ SE_nets
 `r end_button()`
 `r hrule()`
 
-We can use the standard error to calculate a *95% confidence interval*. We would expect the population mean to lie inside this interval 95% of the time. Confidence intervals (CIs) are a useful way of visualising uncertainty in an estimate. The formula for a (normal) 95% CI is:
+We can use the standard error to calculate a *95% confidence interval*. The interpretation of a confidence interval under a frequentist definition can be confusing. It states that if we were to draw samples from the same population many times (or repeat this "experiment" many times), we would expect that 95% of our calculated confidence intervals would contain the population mean. A more straightforward interpretation is that we are _95% confident that our interval contains the population mean_. Confidence intervals (CIs) are a useful way of visualising uncertainty in an estimate. The formula for a (normal) 95% CI is:
 
 $\bar{x} \pm 1.96 \times SE$
 
@@ -209,7 +190,7 @@ We will compare the two means using the two-sample Student's t-test. We have the
 
 The formula for the test statistic is as follows:
 
-$t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\frac{\hat{s}_1^2 + \hat{s}_2^2}{n}}}$
+$t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\frac{\hat{s}^{2}_1 + \hat{s}^{2}_2}{n}}}$
 
 where $\bar{x}_1$ and $\bar{x}_2$ are the means of the two groups, $\hat{s}_1^2$ and $\hat{s}_2^2$ are the sample variances of the two groups, and $n$ is the sample size (the same in each group).
 
@@ -332,7 +313,7 @@ t_stat <- get_t_stat(COI_control, COI_nets)
 
 `r begin_button(9)`
 
-**A9.** p-value is around 0.37, which is greater than 0.05 so not significant at the 5% level. Based on this value, we would accept the null hypothesis that there is no difference between COI in the control and bednets populations.
+**A9.** p-value is around 0.37, which is greater than 0.05 so not significant at the 5% level. Based on this value, we cannot reject the null hypothesis that there is no difference between COI in the control and bednets populations.
 
 `r end_button()`
 `r hrule()`
@@ -354,11 +335,11 @@ Above, we used this formula for the t-test statistic:
 
 $t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\frac{\hat{s}_1^2 + \hat{s}_2^2}{n}}}$
 
-Let's rewrite this slightly. First, we will use $d$ to represent the difference between the mean COI in the two populations. It is this difference that we are interested in, and so this is often given the special name **effect size**. A larger effect size means there is a bigger difference between our populations, and so we are more likely to detect it. Second, we will use $s^2$ to represent the variance in COI in both populations. The new version of the formula becomes:
+Let's rewrite this slightly. First, we will use $d$ to represent the difference between the mean COI in the two populations. It is this difference that we are interested in - as it is the differene between our two study treatments, interventions, _etc._, and so this is often given the special name **effect size**. A larger effect size means there is a bigger difference between our populations, and so we are more likely to detect it. Second, we will use $s^2$ to represent the variance in COI in both populations (remember, we have assumed variance is the same in our two populations). The new version of the formula becomes:
 
 $t = \frac{d}{\sqrt{\frac{2s^2}{n}}}$
 
-The following block of code defines these parameters and then plots the distribution of the test statistic under the null and alternative hypotheses. The critical values of the distribution are shown as vertical dashed lines. Recall that the power is the proportion of the red distribution that lies outside of these lines.
+The following block of code defines these parameters and then plots the distribution of the test statistic under the null and alternative hypotheses. The critical values, or "cut off" points for our designated $\alpha$ value (level of significance), of the null distribution are shown as vertical dashed lines. Recall that the power is the proportion of the red distribution that lies outside of these lines.
 
 ```{r, out.width="60%"}
 # input parameters
@@ -476,7 +457,7 @@ qplot(x = d, y = get_pow_ttest(d, s, n, alpha)*100) + theme_bw() +
 `r hrule()`
 
 
-From the analysis above, we can see that the orginal study, which used a sample size of `n = 10`, had extremely low power. We were only powered to detect a significant difference between groups if there was a difference in average COI of more than 1.5, which is quite a large difference. On the other hand, if we wanted to detect differences of COI down to 0.5 then we would need a sample size closer to `n = 65`. Given these findings, it is not surprising that we got a non-significant result in the real data analysis. Unfortunately, this study was probably a waste of both time and money. It may have generated some interesting descriptive statistics, and the results can be used as pilot data when designing future studies, but in terms of answering the key scientific question it was doomed to failure from the outset. The hard truth is - not all studies are worth doing!
+From the analysis above, we can see that the orginal study, which used a sample size of `n = 10`, had extremely low power. We were only powered to detect a significant difference between groups if there was a difference in average COI of more than 1.5, which is quite a large difference. On the other hand, if we wanted to detect differences of COI down to 0.5 then we would need a sample size closer to `n = 65`. Given these findings, it is not surprising that we got a non-significant result in the real data analysis. Unfortunately, this study was probably a waste of both time and money. It may have generated some interesting descriptive statistics, and the results can be used as pilot data when designing future studies, but in terms of answering the key scientific question it was doomed to failure from the outset. _**The hard truth is - not all studies are worth doing!**_
 
 
 # Comparing DR mutation prevalence {-}
@@ -721,7 +702,7 @@ We need to account for dropout in our sample size calculations to ensure that we
 
 $n_{\text{adjusted}} = \frac{n_{\text{original}}}{1 - p_{\text{dropout}}}$
 
-where $n_{\text{original}}$ is the raw sample size that we get out of our power analysis, and $p_{\text{dropout}}$ is the proportion of dropout that expect for a particular reason. For example, if our original sample size is `n = 100` and we expect 20% dropout then we do $n_{\text{adjusted}} = 100 / (1 - 0.2) = 100 / 0.8 = 125$. So, we need 125 people to account for this much dropout. We can easily check this - if we have 125 people and 20% of them drop out then we lose 25 people, bringing us back down to 100.
+where $n_{\text{original}}$ is the raw sample size that we get out of our power analysis, and $p_{\text{dropout}}$ is the proportion of dropout that expect for a particular reason. For example, if our original sample size is `n = 100` and we expect 20% dropout then we do $n_{\text{adjusted}} = 100 / (1 - 0.2) = 100 / 0.8 = 125$. So, we need 125 people to account for this much dropout. We can easily check this: if we have 125 people and 20% of them drop out then we lose 25 people, bringing us back down to 100.
 
 **Q21.** A control programme wants to determine whether the frequency of *dhps* K540E mutations in their country is above 10%. If so, they plan on switching first line drugs away from Sulfadoxine-Pyrimethamine. They plan on replicating this study in 5 distinct regions throughout the country. A statistical sample size calculation has found that 220 samples will be needed to achieve the power they want. However, each of the 5 laboratories involved in processing the samples has different levels of experience, resulting in different rates of samples being lost. The estimated proportion of samples lost in each of the labs is as follows:
 
