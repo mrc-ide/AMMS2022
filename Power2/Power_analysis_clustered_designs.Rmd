@@ -1,0 +1,352 @@
+---
+title: "AMMS Power Analysis Practical - Clustered Designs" 
+author: "Bob Verity"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    theme: readable
+    highlight: tango
+    code_folding: show
+    toc: yes
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
+    number_sections: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F, 
+                      fig.align = 'center', fig.keep = 'all')
+```
+
+<!-- Here we style out button a little bit -->
+
+```{=html}
+<style>
+.showopt {
+background-color: #004c93;
+color: #FFFFFF; 
+width: 100px;
+height: 20px;
+text-align: center;
+vertical-align: middle !important;
+border-radius: 8px;
+float:right;
+}
+
+.showopt:hover {
+background-color: #dfe4f2;
+color: #004c93;
+}
+
+</style>
+```
+
+
+# Dependencies for Practical {-}
+
+Please copy and paste the below code chunk in it's entirety to your console to download R package libraries needed for this practical. If you are having trouble installing any of the R packages, please ask an instructor for a pre-loaded flash drive.
+
+```{r, class.source = "fold-show"}
+if (!("tidyverse" %in% installed.packages())) {
+  install.packages("tidyverse")
+}
+```
+
+Now load all of those libraries into this session using the code chunk below. Please copy and paste it in its entirety.
+
+```{r, class.source = "fold-show"}
+library(tidyverse)
+```
+
+Finally, source the additional functions that are needed for this practical by copy-pasting this function:
+
+```{r, class.source = "fold-show"}
+source("source_functions/power2_utils.R")
+```
+
+
+# Intro to clustered designs {-}
+
+### Overview of Data {-}
+
+text
+
+### Practical Goals {-}
+
+By the end of this practical, you should be able to: 
+
+- Text
+
+# Increased uncertainty due to clustering {-}
+
+If prevalence is $p$ then the spread of observed values between clusters follows a fairly predictable pattern. We can construct a 95% CI by simply pooling results.
+
+```{r}
+n_clusters <- 10
+n_samp <- 100
+prev <- 0.3
+
+cluster_prev <- data.frame(cluster = 1:n_clusters,
+                           p = rbinom(n_clusters, n_samp, prev) / n_samp)
+
+barplot_clusters(cluster_prev)
+
+p_bar <- mean(cluster_prev$p)
+
+SE <- sqrt(p_bar*(1 - p_bar) / (n_samp*n_clusters - 1))
+
+p_bar + c(-1.96, 1.96)*SE
+```
+
+Now look at some over-dispersed data. Note that the mean is the same. What can cause overdispersion? What happens if we try to calculate CI the normal way?
+
+```{r}
+n_clusters <- 10
+n_samp <- 100
+prev <- 0.3
+ICC <- 0.5
+
+cluster_prev <- data.frame(cluster = 1:n_clusters,
+                           p = draw_overdispersed(n_clusters, n_samp, prev, ICC) / n_samp)
+
+barplot_clusters(cluster_prev)
+
+p_bar <- mean(cluster_prev$p)
+
+SE <- sqrt(p_bar*(1 - p_bar) / (n_samp*n_clusters - 1))
+
+p_bar + c(-1.96, 1.96)*SE
+```
+
+Let's estimate a design effect. Load some simulated data
+
+```{r, echo=FALSE, eval=FALSE}
+# simulate some overdispersed data
+set.seed(4)
+n_clusters <- 10
+n_samp <- 100
+prev <- 0.3
+ICC <- 0.1
+
+prev_overdispersed <- data.frame(cluster = 1:n_clusters,
+                                 n_samp = n_samp,
+                                 p = draw_overdispersed(n_clusters, n_samp, prev, ICC) / n_samp)
+
+barplot_clusters(prev_overdispersed)
+
+# save to file
+save(prev_overdispersed, file = "data/prev_overdispersed.RData")
+```
+
+```{r}
+load("data/prev_overdispersed.RData")
+
+prev_overdispersed
+```
+
+Calculate variance of sample
+
+```{r}
+var_clust <- var(prev_overdispersed$p) / (n_clusters - 1)
+var_clust
+```
+
+Calculate what variance would be under simple random sampling
+
+```{r}
+p_bar <- mean(prev_overdispersed$p)
+n_samp_total <- sum(prev_overdispersed$n_samp)
+var_srs <- p_bar*(1 - p_bar) / (n_samp_total - 1)
+var_srs
+```
+
+Calculate design effect
+
+```{r}
+Deff <- var_clust / var_srs
+Deff
+```
+
+The true design effect is given by `1 + (n_samp - 1)*ICC`. These data were generated with n_samp = 100 and ICC = 0.1. Was your estimate close?
+
+```{r}
+1 + (100 - 1)*0.1
+```
+
+Our effective sample size is divided through by this Deff
+
+```{r}
+n_samp_eff <- n_samp / Deff
+n_samp_eff
+```
+
+We construct CI with this new n
+
+```{r}
+SE_adj <- sqrt(p_bar*(1 - p_bar) / (n_clusters*n_samp_eff - 1))
+
+p_bar + c(-1.96, 1.96)*SE_adj
+```
+
+Visualise this process multiple times with plot
+
+```{r}
+n_clusters <- 10
+n_samp <- 100
+prev <- 0.3
+ICC <- 0.3
+test1(n_clusters, n_samp, prev, ICC)
+```
+
+Show how to do this in DRpower?
+
+```{r}
+DRpower::estimate_prevalence(c(5,1,2), 10)
+```
+
+
+# Comparing two groups {-}
+
+- compare two groups taking account of ICC
+- statistical test
+- power analysis
+- sample size calculation
+
+```{r, echo=FALSE, eval=FALSE}
+# simulate some overdispersed data
+set.seed(1)
+n_clusters <- 10
+n_samp <- 100
+prev1 <- 0.2
+prev2 <- 0.6
+ICC <- 0.3
+
+# (regions of Tanzania)
+cluster_twogroups <- data.frame(region = rep(c("Geita", "Njombe"), each = n_clusters),
+                                cluster = rep(1:n_clusters, times = 2),
+                                n_samp = n_samp,
+                                p = c(draw_overdispersed(n_clusters, n_samp, prev1, ICC) / n_samp,
+                                      draw_overdispersed(n_clusters, n_samp, prev2, ICC) / n_samp))
+
+# save to file
+save(cluster_twogroups, file = "data/cluster_twogroups.RData")
+```
+
+Load data from file
+
+```{r}
+load("data/cluster_twogroups.RData")
+
+cluster_twogroups
+```
+
+Pool samples
+
+```{r}
+twogroups_summary <- cluster_twogroups %>%
+  group_by(region) %>%
+  summarise(n_samp = sum(n_samp),
+            p = mean(p))
+
+twogroups_summary
+```
+
+We already learned the appropriate test here - the two-proportion Z-test
+
+$Z = \frac{\hat{p}_1 - \hat{p}_2}{\sqrt{\frac{\hat{p}_1(1 - \hat{p}_1)}{n_1} + \frac{\hat{p}_2(1 - \hat{p}_2)}{n_2}}}$
+
+```{r}
+# get values from summary table
+n <- twogroups_summary$n_samp
+p <- twogroups_summary$p
+
+# calculate Z statistic
+Z <- (p[1] - p[2]) / sqrt(p[1]*(1 - p[1]) / n[1] + p[2]*(1 - p[2]) / n[2])
+Z
+```
+
+```{r}
+p <- c(0.1, 0.2)
+p_bar <- mean(p)
+n <- c(100, 100)
+prop.test(n*p, n = n, correct = FALSE)
+
+Z <- (p[1] - p[2]) / sqrt(p[1]*(1 - p[1]) / n[1] + p[2]*(1 - p[2]) / n[2])
+Z <- (p[1] - p[2]) / sqrt(p_bar*(1 - p_bar)*(1 / n[1] + 1 / n[2]))
+Z
+
+2*pnorm(abs(Z), lower.tail = FALSE)
+```
+
+We can calculate a p-value as follows:
+
+```{r}
+# calculate p-value
+2*pnorm(abs(Z), lower.tail = FALSE)
+```
+
+What about t-test?
+
+Two-sample t-test with unequal variance (sometimes called "Walch's" t-test). The formula for the test statistic is slightly different as we are allowing for unequal sample sizes between groups:
+
+$t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\frac{\hat{s}_1^2}{n_1} + \frac{\hat{s}_2^2}{n_2}}}$
+
+where $\bar{x}_1$ and $\bar{x}_2$ are the means of the two groups, $\hat{s}_1^2$ and $\hat{s}_2^2$ are the sample variances of the two groups, and $n_1$ and $n_2$ are the sample sizes of the two groups.
+
+```{r}
+t.test()
+```
+
+# Comparing one group against threshold {-}
+
+- compare one group against fixed value
+- statistical test
+- power analysis
+- sample size calculation
+
+
+# Comparing COI between two populations {-}
+
+## Statistical testing {-}
+
+```{r, echo=FALSE, eval=FALSE}
+# code to generate the made-up COI data
+set.seed(1)
+COI_control <- rpois(10, lambda = 1.0) + 1
+COI_nets <- rpois(10, lambda = 0.5) + 1
+save(COI_control, file = "data/COI_control.RData")
+save(COI_nets, file = "data/COI_nets.RData")
+```
+
+You have been asked to analyse some data on complexity of infection (COI) in two populations, one of which experienced a rapid scale-up of bednets and the other acting as a control. COI tends to be higher in populations with high transmission intensity, so the hypothesis here is that bednets will have caused a drop in COI on average compared to the control population.
+
+Let's load the COI data and have a quick look at the distribution:
+
+```{r, class.source = "fold-show", results='hold'}
+# load COI data
+
+```
+
+We can see that we have only 10 samples from each population, and it's difficult to tell from looking whether COI is greater in one population or the other.
+
+
+**Q1.** What is the mean COI in each population? What is the variance in each population? Is the mean higher or lower in the population with bednets?
+
+`r begin_button(1)`
+
+**A1.** Means and variances shown below. The mean is slightly higher in the control group.
+```{r, results='hold', class.source = "fold-show"}
+# get mean and variance of control population
+#mean(COI_control)
+#var(COI_control)
+```
+
+`r end_button()`
+`r hrule()`
+
+The mean COI in the control sample is 2.1. This is our best *estimate* of the mean COI in the control *population*, but we would not be at all surprised if the population value differed from 2.1 slightly. For example, it may be that the mean COI in the population is 2.0, and we just happened to sample individuals with slightly higher COIs by chance.
+
