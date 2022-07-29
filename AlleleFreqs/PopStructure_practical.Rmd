@@ -66,6 +66,7 @@ if (any(deps)) {
     devtools::install_github("bobverity/rmaverick", ref = "v1.1.0")
   }
 }
+
 ```
 
 Now load all of those libraries into this session using the code chunk below. Please copy and paste it in its entirety.
@@ -86,7 +87,14 @@ source("source_functions/pop_structure_utils.R")
 
 # Intro to population structure and allele frequency metrics {-}
 
+
 One of the most fundamental observations that we can make from genetic data is how the frequencies of different alleles vary over time and over space. For loci where mutations confer drug resistance, allele frequencies tell us something with direct clinical implications - if an allele is at high frequencies then we might consider switching first-line drugs. However, even for loci that have no direct impact on phenotype, and therefore are selectively neutral, allele frequencies can give us important information about what is going on in the parasite population. These loci will be influenced by factors such as prevalence, human and mosquito population size, and migration rates between different sub-populations. If we can correctly interpret these signals then we can use neutral allele frequencies to tell us things about population structure and connectivity that can be relevant for control purposes.
+
+_**Definition:** An allele is the identity of a particular genetic locus or sequence that is inherited between parents and offspring._
+
+_**Definition:** A locus is a fixed position on a chromosome where a particular genetic marker is located._
+
+_**Definition:** A neutral allele is one which is not positively or negatively affecting an organism's fitness and undergoing selection._
 
 ### Overview of Data {-}
 
@@ -107,19 +115,24 @@ By the end of this practical, you should be able to:
 
 # Population genetics through simulation {-}
 
-Explanation of the term "deme"?
+First we will simulate a population and different frequencies of alleles. To do this we will use an R function called sim_freqs to generate allele frequencies.
 
 ## Focusing on a single subpopulation {-}
 
+We can think of subpopulations where there is no barrier to gene flow as  or "demes"- these could represent villages. 
+
 ### Allele frequency changes in a single deme {-}
 
-Try running this function lots of times. What do you notice about the allele frequency over time?
+First we will simulate the allele frequencies of a population of 1000 individuals infected with malaria. Try running this function lots of times. What do you notice about the allele frequency over time?
 
 ```{r}
 sim1 <- sim_freqs(N = 1000, mut_rate = 0)
+
 ```
 
 Now repeat with a smaller population size (which represents the number of *infected* hosts in our case). What do you notice about the strength of drift? What happens once an allele reaches a frequency of 0 or 1? Why is this?
+
+_**Definition:** Drift is the variation in the frequency of alleles in a small population due to the random loss of alleles across generations._
 
 ```{r}
 sim_freqs(N = 100, mut_rate = 0)
