@@ -409,7 +409,8 @@ _**Conceptual Question:** Describe the MLE distribution. Is this what you expect
 
 
 #### HMM IBD
-As stated above, we will use `hmmIBDR` R package [wrapper](https://github.com/OJWatson/hmmibdr) to calculate pairwise IBD. Please see the code belwo for ease of running the algorithm. Note, we are going to have to do some data munging and writing of input file in order to use the `hmmIBD` [program](https://github.com/glipsnort/hmmIBD).
+As stated above, we will use `hmmIBDR` R package [wrapper](https://github.com/OJWatson/hmmibdr) to calculate pairwise IBD. Please see the code belwo for ease of running the algorithm. Note, we are going to have to do some data munging and writing of input file in order to use the `hmmIBD` [program](https://github.com/glipsnort/hmmIBD). 
+_**To Munge**_: Extract the `GT` calls from the VCF and converrt them to _0_ for homozygous referent calls, _1_ for homozygous alternative calls, and _-1_ for heterozgous calls. Then add a column for chromosome and position (columns one and two, respectively) to your newly created genotype matrix. Explore the [hmmIBD documentation](https://github.com/glipsnort/hmmIBD) for a justification of this munging. Separately, you will need to create a file that contains the population allele frequencies. For each sample, calculate the referent-within sample allele frequencies and then take the mean across samples per locus. 
 
 _**Caveat**: The `hmmIBD` algorithm assumes that all samples are monoclonal. As a result, it does not accept heterozygote calls natively. As a user, we have two options: (1) to set those heterozygote calls to missing (a conservative approach), or (2) make a strong assumption about what a heterozygote call means (an aggressive approach). Here, I have forced the samples to be monoclonal by estimating their within-sample allele frequencies and rounding to the nearest variant._
 
@@ -595,7 +596,11 @@ _**Conceptual Question:** Is there a correlation here between mean COI and withi
 _**Answer:** No, but the lowest COI was associated with the greatest within deme IBD._
 <br>
 <br>
-
+_**Conceptual Question:** Why did our expectation of the relationship fo within-deme IBD and transmission intensity not match reality?_
+<br>
+_**Answer:** Our expectations do not always match realized data._
+<br>
+<br>
 ## Isolation by Distance
 Next, we will explore the concept of isolation by distance, which is the theory that as pairs move further away in space, they should be less related (_i.e._ closer pairs are more likely to reproduce). This concept is based on spatial relationships, but can also be conceptualized as time (pairs that are separated by multiple generations of time are less likely to be related). Read in the `data/deme_gc_dist.RDS` object to calculate how IBD may decay over distances. Use groupings of:
 
@@ -702,7 +707,7 @@ ggplot() +
         axis.ticks = element_blank())
 
 ```
-_**Conceptual Question:** What can highly related pairs tell you? How do they relate to transmission events? Can you use them to estimate genetic corridors or evidence fo gene flow? Do you think there is active transmission between the mainland and island (see original study hypothesis)?_
+_**Conceptual Question:** What can highly related pairs tell you? How do they relate to transmission events? Can you use them to estimate genetic corridors or evidence of gene flow? Do you think there is active transmission between the mainland and island (see original study hypothesis)?_
 <br>
 <br>
 
@@ -720,10 +725,16 @@ $$IBS=  \frac{1}{n} \sum_{i=1}^{n} \frac{S_{i}} {X_{i}Y_{i}} $$
 
 <br>
 <br>
+_**Question:** Can you think of a different approach to calculating IBS accounting for IBS that accounts for within-sample IBD? How woud you begin to accoutn for this?_
+<br>
+<br>
 
 ## IBD & Polyclonality
 As was described in the case of `hmmIBD`, polyclonality greatly complicates IBD estimates and is an active area of research. Recent solutions include considering the malaria genome as diploid, which allows for heterozygous alleles: [`isoRelate`](https://github.com/bahlolab/isoRelate) or phasing polyclonal infections and estimating IBD from the resultant haplotypes: [deploidIBD](https://github.com/DEploid-dev/DEploid). This is an active area of research and remains a challenge within the malaria genomic epidemiology field.   
 
+<br>
+<br>
+_**Question:** How would you approach calculating IBD in a high-transmission region with numerous likely polyclonal infections? What advantages are there to phasing data? Are there other unpublished (not peer-reviewed) approaches for calculating IBD in polyclonal infections?_
 <br>
 <br>
 
@@ -742,7 +753,7 @@ Hidden Markov models (HMMs) are a common statistical approach in population gene
 
 ## Coalescent Model
 
-Coalescent theory is one of the central pillars of population genetics and provides a framework for how loci (genes, individuals, etc.) have been derived from a common ancestor backwards in time, classically using the assumptions of the Wright-Fisher model. One of the main assumptions of the coalescence, is that loci are independent and that no recombination is occurring between loci. To relax this assumption, we must consider the coalescence with recombination. In this framework, a single coalescent tree is no longer representative of the genome (*NB*: genomes are now combination of genes on intervals [0, L) ; [L, L\_{+1}], see [Griffiths & Marjoram 1996](http://lamastex.org/recomb/ima.pdf) for further details). As a result, each loci in the gene interval has a marginal tree due recombination resulting in different genealogical histories of loci. The collection of these trees with respect to recombination breakpoints among loci in the gene interval is termed the Ancestral Recombination Graph (ARG). Relatedness is considered as the time to most recent common ancestor (TMRCA) for a given loci and gives a more refined estimate of relatedness versus the binary distinction of whether or not a specific segment of the genome is IBD.
+Coalescent theory is one of the central pillars of population genetics and provides a framework for how loci (genes, individuals, etc.) have been derived from a common ancestor backwards in time, classically using the assumptions of the Wright-Fisher model. One of the main assumptions of the coalescence, is that loci are independent and that no recombination is occurring between loci. To relax this assumption, we must consider the coalescence with recombination. In this framework, a single coalescent tree is no longer representative of the genome (*NB*: genomes are now combination of genes on intervals [0, L) ; [L, L\_{+1}], see [Griffiths & Marjoram 1996](http://lamastex.org/recomb/ima.pdf) for further details). As a result, each loci in the gene interval has a marginal tree due recombination resulting in different genealogical histories of loci. The collection of these trees with respect to recombination breakpoints among loci in the gene interval is termed the Ancestral Recombination Graph (ARG). Relatedness is considered as the time to most recent common ancestor (TMRCA) for a given loci and gives a more refined estimate of relatedness versus the binary distinction of whether or not a specific segment of the genome is IBD (*as discussed in our lecture*).
 
 <p align="center">
 
