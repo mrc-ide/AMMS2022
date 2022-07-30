@@ -1,11 +1,8 @@
 ---
-title: "AMMS IBS & IBD Practical"
-author: "Nick Brazeau, Sophie Berube, Izzy Routledge, Abebe Fola"
+title: "Calculating IBS & IBD"
+author: "Nick Brazeau, Sophie Berube, Izzy Routledge, & Abebe Fola"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
-  word_document:
-    toc: yes
-    toc_depth: '2'
   html_document:
     theme: readable
     highlight: tango
@@ -450,6 +447,7 @@ readr::write_tsv(afmat, file = "data/af_matrix_for_hmmIBD.txt", col_names = F)
 tf <- tempfile(pattern = "output_simdat")
 out <- hmmibdr::hmm_ibd(input_file = "data/gt_matrix_for_hmmIBD.txt",
                         allele_freqs =  "data/af_matrix_for_hmmIBD.txt",
+                        rec_rate = 1e-2,
                         output_file = tf)
 
 # hmmIBD tidy
