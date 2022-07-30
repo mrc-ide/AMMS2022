@@ -174,7 +174,7 @@ What happens if you increase the mutation rate? What happens if you increase the
 
 Run the code below multiple times to repeat the simulation of drift, but now also plotting homozygosity. What do you notice about how homozygosity changes over time? (It always increases to 1).
 
-_**Definition:** Homozygosity is... ._
+_**Definition:** Homozygosity is the existence of identical allleles at a given locus._
 
 ```{r}
 sim_freqs(N = 1000, t_out = seq(0, 365 * 10, 7), plot_homo = TRUE)
@@ -205,10 +205,11 @@ sim1 <- sim_freqs(N = 1000, demes = 10, mig_rate = 0, mut_rate = 1e-4)
 
 #### Calculating $F_{ST}$ to measure population differentiation{-}
 
-**Definition: Fixation index, or $F_{ST}$ and Jost's D are both measures of genetic differentiation between different subpopulations.**
+Next we will explore a metric used to measure population differentiation.
+
+_**Definition:** Fixation index, or $F_{ST}$ and Jost's D are both measures of genetic differentiation between different subpopulations._
 
 When $F_{ST}$ is close to **1** it means that individuals in a population tend to carry a _small number of alleles_. Individuals are “differentiated” in the sense that alleles are not freely mixing between people.
-
 
 
 High values of $F_{ST}$ and Jost's D both suggest a greater genetic differentiation between the subpopulations being measured. However both metrics have different approaches to measure genetic differentiation. 
@@ -317,7 +318,9 @@ Note, however, that these patterns take a very long time to build up. So we are 
 
 # Analysis of DRC data {-}
 
-Load the DRC MIP data. This data is a slightly simplified version of that used in this paper : [TO DO! LINK TO PAPER!!]
+Now we will explore allele frequencies in a real dataset. First, we will load a dataset collected using Molecular Inversion Probes (MIPs) which are a method of high throughput sequencing. This dataset consists of 2537 samples collected in 2013–2015 from the DRC and surrounding countries. 
+ 
+ This data is a slightly simplified version of that used in this paper : [Verity et al. 2020](https://pubmed.ncbi.nlm.nih.gov/32355199/).
 
 ```{r, echo=FALSE, eval=FALSE}
 # Code to process raw data from DRC paper. This code block does not need to be run by the user.
@@ -368,10 +371,12 @@ MIP_data_noDRC <- MIPanalyzer::filter_samples(MIP_data, MIP_data$samples$Country
 MIP_data_noDRC
 ```
 
-PCA - [to do - explain what a PCA is ]
 
+## PCA of DRC data {-}
 
-Now lets do PCA on the within-sample allele frequencies
+Principal Components Analysis or PCA can be used to reduce the number of dimensions or variables in a dataset, and can be used to more easily summarize data and in this case visualise genetic differentiation. 
+
+Now lets do PCA on the within-sample allele frequencies.
 
 ```{r}
 wsaf_impute <- MIPanalyzer::get_wsaf(MIP_data_noDRC, impute = TRUE, FUN = mean)
@@ -422,10 +427,9 @@ MIPanalyzer::plot_pca_contribution(pca, component = 2, chrom = MIP_data$loci$CHR
 
 # Inferring population structure using *rmaverick* {-}
 
+*rmaverick* is an R package which we will use to further investigate population structure.  
 
-[explain what *rmaverick* is and how going to use it ]
-
-Load barcode data from Amy Bei's 2018 paper [link to paper]. This data has already been filtered to remove the two Thies samples, and to order in terms of date (2001-2002 vs. 2014) and location (Dielmo and Ndiop)
+First we will load genetic barcode data from [Bei et al., 2018](https://pubmed.ncbi.nlm.nih.gov/29325146/ ) . This study contains samples taken at two separate time points over ten years apart in two locations in Senegal.  These data have already been filtered to remove the two Thies samples, and to order in terms of date (2001-2002 vs. 2014) and location (Dielmo and Ndiop). 
 
 ```{r, echo=FALSE, eval=FALSE}
 # code not run - this is how I get the raw data from SIMPLEGEN and process it
@@ -477,7 +481,7 @@ for (i in 8:31) {
 head(mav_data)
 ```
 
-Next, load the data into *rmaverick*, and make a first model set [explain]. Print the project to check everything looks as planned (25 samples, 24 loci etc.)
+Next, load the data into *rmaverick*, and set up our first model. Then print the project to check everything looks as planned (25 samples, 24 loci etc.)
 
 ```{r}
 myproj <- rmaverick::mavproject() %>%
@@ -487,9 +491,9 @@ myproj <- rmaverick::mavproject() %>%
 myproj
 ```
 
-[explain what MCMC is]
+Markov Chain Monte Carlo (MCMC) approaches allow us to fit models by sampling from complex probability distributions. Here we will use MCMC to fit our model in rmaverick. 
 
-Run MCMC. Users should run this with pb_markdown = FALSE.
+Let's run an MCMC in rmaverick. Users should run this with pb_markdown = FALSE.
 
 ```{r}
 myproj <- rmaverick::run_mcmc(myproj, K = 1:8, burnin = 1e3, samples = 1e3,
@@ -497,15 +501,21 @@ myproj <- rmaverick::run_mcmc(myproj, K = 1:8, burnin = 1e3, samples = 1e3,
 
 ```
 
-Some MCMC diagnostic checks. First, check that coupling rates are above 0. Do this for every value of K from 2 to the max value explored.
+First we will carry out some MCMC diagnostic checks. Check that coupling acceptance rates are above 0. Do this for every value of K (the number of subpopulations) from 2 to the max value explored.
 
-[define coupling rates and definition]
+
+
+[Question for Bob - is rmaverick MCMCMC? Not sure how far to get into the diagnostics but I think more explanation required.]
+
+_**Definition:** Coupling acceptance rates are the rates of proposals in the MCMC which are accepted._
+
+_**Definition:** The K value is the number of subpopulations in rmaverick._
+
 
 ```{r}
 rmaverick:::plot_mc_acceptance(myproj, K = 8)
 ```
 
-[define what k parameter does]
 
 Now check what the program thinks about the best value of K. In this case, values around 3-5 are reasonably likely
 
@@ -514,7 +524,7 @@ rmaverick::plot_logevidence_K(myproj)
 rmaverick::plot_posterior_K(myproj)
 ```
 
-Produce Structure plot. [explain what this is] Add vertical lines to break up into the following groups:
+Finally,  we will produce a STRUCTURE plot. This plot shows differences in the distribution of genetic variants amongst populations  We will add vertical lines to break up into the following groups:
 1. Dielmo 2001-2001
 2. Ndiop  2001-2002
 1. Dielmo 2014
@@ -535,7 +545,7 @@ Overall, we can see evidence of increasing population structure over time. Compa
 
 -------------------------
 
-Concluding questions to summarize:
-1.
-2.
-3.
+ConcludiCCCquncluding questions to summarize:
+1. What can allele frequencies tell us about population differentiation?
+2. What does $F_{ST}$ tell us and what are its limitations?
+3. When is population structure more ambiguous when using allele frequencies?
