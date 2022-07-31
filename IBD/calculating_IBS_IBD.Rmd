@@ -96,20 +96,37 @@ source("R/utils.R")
 
 # Introduction
 ## Useful Definitions {.unnumbered}
-_**Definition:** An allele is the identity of a particular genetic locus or sequence that is inherited between parents and offspring._
-_**Definition:** A locus is a fixed position on a chromosome where a particular genetic marker is located._
-_**Definition:** Sequencing data consists of sequences of DNA obtained from a DNA sequencing reaction_
-_**Definition:** Complexity of infection, or multiplicity of infection, is a measure of the number of different malaria parasite clones in an individual sample._
-_**Definition:** A monoclonal malaria infection contains one parasite strain, or "genome" (complexity of infection [COI] = 1), while a polyclonal infection contains more than one parasite strain (COI > 1)._
-_**Definition:** A deme is a local population that has individuals that interbreed and share genetic material._
+_**Definition:** An allele is the state of a particular genetic locus or sequence that is inherited between parents and offspring._ <br>
+_**Definition:** A locus is a fixed position on a chromosome where a particular genetic marker is located._ <br>
+_**Definition:** Sequencing data consists of sequences of DNA obtained from a DNA sequencing reaction_ <br>
+_**Definition:** Complexity of infection, or multiplicity of infection, is a measure of the number of different malaria parasite clones in an individual sample._ <br>
+_**Definition:** A monoclonal malaria infection contains one parasite strain, or "genome" (complexity of infection [COI] = 1), while a polyclonal infection contains more than one parasite strain (COI > 1)._ <br>
+_**Definition:** A deme is a local population that has individuals that interbreed and share genetic material._ <br>
+<br>
+<br>
+
 ## Relatedness Overview {.unnumbered}
 
-During prior sessions, you have explored how to estimate genetic relatedness based on levels of population diversity, structure, and connectivity. In this practical, we will focus on between-parasite, or pairwise, measures of genetic relatedness. These are more "individual" focused measures of relatedness versus population, or deme, focused measures of relatedness.
+During prior sessions, you have explored how to estimate relationships based on levels of population diversity, structure, and connectivity. In this practical, we will focus on between-parasite, or pairwise, measures of genetic relatedness. These are more "individual" focused measures of relatedness versus population, or deme, focused measures of relatedness.
 <br>
-There are many ways to estimate relatedness among individuals. One method you may have encountered in the past is [phylogenetic trees](https://en.wikipedia.org/wiki/Phylogenetic_tree), which is a common approach for modeling relationships between bacterial and viral pathogens. However, in recombining pathogens, like malaria, phylogenetic approaches are complicated (due to underlying assumptions of nonrecombining regions). Instead, we can leverage our knowledge about recombination and use it to estimate relatedness through identity.
+There are two mains ways to estimate relatedness among individuals: identity by descent (IBD) or Time to Most Recent Common Ancestor (TMRCA) (see [Speed & Balding 2015](https://pubmed.ncbi.nlm.nih.gov/25404112/) for further discussion). We will be focusing on IBD, which leverages recombination to detect recent common inheritance of genetic material, or genetic relatedness.
+<br>
+Remember, that recombination and random segregation occurs with homologous chromosome pairing during the process of meiosis. This means that "maternal" and "paternal" genetic material is exchanged to create new "daughter" cells with unique genetic material (e.g. a new, unique haplotype).
+
+<p align="center">
+![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/Meiosis.jpeg){height="300px"}
+</p>
+
 
 <br>
-In the schematic below, a single mosquito has bitten two different individuals infected with a single strain of the malaria parasite, resulting in a superinfection. The two strains (red vs purple) then undergo recombination in the mosquito midgut and produce progeny that are siblings and expected to share half of their genomes on average.
+<br>
+
+Applying this concept to malaria in the schematic below, a single mosquito has bitten two different individuals infected with a single strain of the malaria parasite, resulting in a superinfection. The two strains (red vs purple) then undergo recombination in the mosquito midgut and produce progeny that are siblings and expected to share half of their genomes on average. 
+<br>
+From a population genetics perspective, this exchange of genetic material via recombination can be leveraged to detect strong signals of genetic relatedness between individuals. For example, moving further along in the schematic, the mosquito bites three new hosts and transfers a new "daughter" parasites to the susceptible host respectively (*N.B.*, since only a single strain was transmitted, no cotransmission infections resulted despite the potential). The pedigree on the right shows two of the parasite siblings and highlights how much of their genome was inherited from the same parent in the same genomic location. 
+<br> 
+As a result, one way to conceptualize the genome is as blocks, or segments, that are joined together, where each block has its own unique ancestral history. We will explore the concept that as time increases, or there is an increasing number of generations generations, IBD blocks become smaller  (*i.e.* as the number of recombination events increases, blocks are broken into smaller and smaller bits).
+<br>
 <br>
 
 <p align="center">
@@ -117,23 +134,13 @@ In the schematic below, a single mosquito has bitten two different individuals i
 </p>
 
 
-Remember, that recombination and random segregation occurs with homologous chromosome pairing during the process of meiosis. This means that "maternal" and "paternal" genetic material is exchanged to create new "daughter" cells with unique genetic material (e.g. a new, unique haplotype).
-
-<p align="center">
-![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/Meiosis.jpeg){height="300px"}
-</p>
-
-From a population genetics perspective, this exchange of genetic material via recombination can be leveraged to detect strong signals of genetic relatedness between individuals. For example, moving further along in the schematic, the mosquito bites three new hosts and transfers a single strain of "daughter" genetic material (*N.B.*, since only a single strain was transmitted, no cotransmission infections resulted despite the potential). The pedigree on the right shows two of the parasite siblings and highlights how much of their genome is "identical" or, was inherited from the same parent in the same genomic location (identity by descent). <br> As a result, one way to conceptualize the genome is as blocks, or segments, that are joined together. Each block has its own unique ancestral history, with a different "tree" of relatedness as depicted in the schematic below. Additionally, as we look further and further back in time, these blocks become smaller and our trees become "deeper". We will explore this concept that increasing time, or increasing generations, results in smaller blocks (*i.e.* as the number of recombination events increases, blocks are broken into smaller and smaller bits).
-
-<p align="center">
-![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/mini_arg.png){width="500px"}
-</p>
 <br>
 <br>
 <br>
+
 ## IBS/IBD Overview {.unnumbered}
 
-As described above, we can consider pairwise relatedness by determining if the genetic sequence at a give position in the genome, a loci, between two parasites is identical (e.g. the same allele). We can either simply measure the number of sites with identical alleles between two individuals, termed identity by state (IBS), or, we can use statistical models to determine if identical alleles and "blocks" of the genome were likely to be inherited from a common ancestor, termed identity by descent (IBD). It is important to note the differences between IBS and IBD: IBS refers to the "state" or realization of the allele at a loci and can be the result of numerous factors other than ancestry (e.g. selection, drift, structure, chance). In contrast, IBD solely refers to inherited genetic material, which follow specific patterns relevant to public health that we will explore below. The differences between IBS and IBD are visualized in the schematic below, where sites may be IBS but not IBD whilst all sites that are IBD are IBS (*N.B.* only true under the classic definition of IBD).
+As described in the lecture, we can consider pairwise relatedness by determining if the genetic sequence at a give position in the genome, a loci, between two parasites is identical (e.g. the same allele). We can either simply measure the number of sites with identical alleles between two individuals, termed identity by state (IBS), or, we can use statistical models to determine if identical alleles and "blocks" of the genome were likely to be inherited from a common ancestor, termed identity by descent (IBD). It is important to note the differences between IBS and IBD: IBS refers to the "state" or realization of the allele at a loci and can be the result of numerous factors other than ancestry (e.g. selection, drift, structure, chance). In contrast, IBD solely refers to inherited genetic material, which follow specific patterns relevant to public health that we will explore below. The differences between IBS and IBD are visualized in the schematic below, where sites may be IBS but not IBD, whilst all sites that are IBD are IBS.
 
 <p align="center">
 ![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/ibd_vs_ibs.png){width="300px"}
@@ -141,16 +148,16 @@ As described above, we can consider pairwise relatedness by determining if the g
 
 ### IBState {.unnumbered}
 
-As stated above, identity by state, is the proportion of identical loci divided by all measured loci in the genome (shared over total) between two parasites: $\mbox{parasite}_a$ and $\mbox{parasite}_b$, such that: $$IBS= \frac{\mbox{Shared loci}_{ab}}{\mbox{Number of loci}}$$
+Identity by state (IBS) is the proportion of identical loci divided by all measured loci in the genome between two parasites: $\mbox{parasite}_a$ and $\mbox{parasite}_b$, such that: $$IBS= \frac{\mbox{Shared loci}_{ab}}{\mbox{Number of loci}}$$
 
 ### IBDescent {.unnumbered}
 
-As described above, IBD is more complicated to calculate than IBS and requires statistical modeling in order to account for recombination and population allele frequencies. The most common statistical model used is called a Hidden Markov Model (see the *Advanced* section for further sources).
+Identity by Descent (IBD) is more complicated to calculate than IBS and requires statistical modeling in order to account for recombination and population allele frequencies. The most common statistical model used is called a Hidden Markov Model (see the *Further Reading* section for recommended sources).
 <br>
 <br>
 _**Conceptual Question:** What are some reasons that parasite pairs may be IBS but not IBD? What is a method that you have already learned that would increase your suspicion for IBS but not IBD_
 <br>
-_**Answer:** Population allele frequencies (if an allele is very common or fixed in a population, it does not contain as much information if it is identical by descent versus simply by state)_
+_**Answer:** Population allele frequencies (if an allele is very common or fixed in a population, it does not contain as much information to distinguish between IBD and IBS)_
 <br>
 <br>
 _**Conceptual Question:** Are biallelic markers (genotypic positions with two alleles, or possibilities) or multiallelic markers (genotypic positions with multiple alleles) more informative for IBS/IBD. Would you suspect a site with 20 alleles to be identical by chance?_
@@ -161,7 +168,8 @@ _**Answer:** Multiallelic has more information_
 <!-- https://www.tablesgenerator.com/markdown_tables -->
 Below is a table of pros-cons-details of various IBD programs specified for malaria that have been peer-reviewed as of August 5, 2022. 
 <br>
-
+<br>
+<br>
 
 | **Program** 	| **Pros** 	| **Cons** 	| **Details** 	|
 |---	|---	|---	|---	|
@@ -170,9 +178,9 @@ Below is a table of pros-cons-details of various IBD programs specified for mala
 | [isoRelate](https://github.com/bahlolab/isoRelate) 	| + Statistically robust <br><br>+ Handles polyclonals <br><br>+ Statistical testing for "important" loci <br> 	| + Can become computationally intensive  	|  Model assumes a "diploid" state for COI > 1, and thus makes a simplifying assumption about polyclonality 	|
 | [DeploidIBD](https://github.com/DEploid-dev/DEploid) 	| + Statistically robust <br><br>+ Handles polyclonals <br><br>+ Phased sample results <br><br>+ Within-sample estimates of IBD <br> 	| + Computationally intensive 	| Model phases polyclonal samples into monoclonal samples (_i.e._ a sample with COI = 2 becomes two new phased strains: smpl1.1, smpl1.2). As part of phasing, program provides within-sample IBD. From phased sample results, users can use any existing IBD program (`hmmIBD`, `refinedIBD`, etc). Program's primary goal is phasing with within-IBD estimates provided as a "bonus". 	|
 
+<br>
+<br>
 
-<br>
-<br>
 # Overview of Data {.unnumbered}
 This data was simulated using a simple malaria model that takes into account spatial relationships, complexity of infection (COI), and population size under a Wright-Fisher model: [PolySimIBD](https://github.com/nickbrazeau/polySimIBD). Later, you will have an opportunity to interact with this simulator to further refine your intuition for IBS/IBD in the _Self Exploration_ section.
 <br>
@@ -183,7 +191,7 @@ For this practical, we have simulated five populations, or demes: A-E. The demes
 - Five random samples from each deme
 - Incidence as estimated by mean COI per deme\*
 
-_\*As discussed yesterday, COI is a poor measure of incidence in the real world. For our model, it is quite correlated and will be used as a proxy here._
+_\*As discussed yesterday, COI is a poor measure of incidence in the real world. For our model, it is quite correlated (in expectation) and will be used as a proxy here._
 <br>
 
 <p align="center">
@@ -409,7 +417,8 @@ _**Conceptual Question:** Describe the MLE distribution. Is this what you expect
 
 
 #### HMM IBD
-As stated above, we will use `hmmIBDR` R package [wrapper](https://github.com/OJWatson/hmmibdr) to calculate pairwise IBD. Please see the code belwo for ease of running the algorithm. Note, we are going to have to do some data munging and writing of input file in order to use the `hmmIBD` [program](https://github.com/glipsnort/hmmIBD). 
+As stated above, we will use `hmmIBDR` R package [wrapper](https://github.com/OJWatson/hmmibdr) to calculate pairwise IBD. Please see the code belwo for ease of running the algorithm. Note, we are going to have to do some data munging and writing of input file in order to use the `hmmIBD` [program](https://github.com/glipsnort/hmmIBD).    
+<br>
 _**To Munge**_: Extract the `GT` calls from the VCF and converrt them to _0_ for homozygous referent calls, _1_ for homozygous alternative calls, and _-1_ for heterozgous calls. Then add a column for chromosome and position (columns one and two, respectively) to your newly created genotype matrix. Explore the [hmmIBD documentation](https://github.com/glipsnort/hmmIBD) for a justification of this munging. Separately, you will need to create a file that contains the population allele frequencies. For each sample, calculate the referent-within sample allele frequencies and then take the mean across samples per locus. 
 
 _**Caveat**: The `hmmIBD` algorithm assumes that all samples are monoclonal. As a result, it does not accept heterozygote calls natively. As a user, we have two options: (1) to set those heterozygote calls to missing (a conservative approach), or (2) make a strong assumption about what a heterozygote call means (an aggressive approach). Here, I have forced the samples to be monoclonal by estimating their within-sample allele frequencies and rounding to the nearest variant._
@@ -596,11 +605,12 @@ _**Conceptual Question:** Is there a correlation here between mean COI and withi
 _**Answer:** No, but the lowest COI was associated with the greatest within deme IBD._
 <br>
 <br>
-_**Conceptual Question:** Why did our expectation of the relationship fo within-deme IBD and transmission intensity not match reality?_
+_**Conceptual Question:** Why did our expectation of the relationship of within-deme IBD and transmission intensity not match reality?_
 <br>
-_**Answer:** Our expectations do not always match realized data._
+_**Answer:** Our expectations do not always match realized data. There are also multiple confounding variables here, including: migration and incomplete sampling._
 <br>
 <br>
+
 ## Isolation by Distance
 Next, we will explore the concept of isolation by distance, which is the theory that as pairs move further away in space, they should be less related (_i.e._ closer pairs are more likely to reproduce). This concept is based on spatial relationships, but can also be conceptualized as time (pairs that are separated by multiple generations of time are less likely to be related). Read in the `data/deme_gc_dist.RDS` object to calculate how IBD may decay over distances. Use groupings of:
 
@@ -640,6 +650,9 @@ _**Conceptual Question:** How would you describe this relationship? Does it make
 
 ### Network Analysis
 We can also use networks to determine the connectivity of our paired samples. Networks helps us visualize connections that we may not expect and are a useful tool for exploratory data analysis. Additionally, we can use [community detection algorithms](https://towardsdatascience.com/community-detection-algorithms-9bd8951e7dae) to explore which samples may "cluster" together based on relatedness. One way to conceptualize community detection algorithms is to consider that networks measure "popularity" and that samples that are "cliques" should cluster together. Alternatively, a sample may be "friends" with everyone and becomes very central or important to the network. These distinctions may be helpful to determine which demes are particularly connected and may be contributing to sink-source dynamics (see [Wesolowksi _et al._ 2018](https://pubmed.ncbi.nlm.nih.gov/30333020/) for further information on sink-source dynamics).
+<br>
+Read this STDHA [blog](http://sthda.com/english/articles/33-social-network-analysis/136-network-analysis-and-manipulation-using-r) networks and on community detection algorithms and use the R packages: [tidygraph](https://tidygraph.data-imaginist.com/index.html) and [ggraph](https://ggraph.data-imaginist.com/) to try to generate the figure below. 
+
 ```{r}
 adj_graph <- ibd_mle_long %>%
   tidygraph::as_tbl_graph(., directed = F)
@@ -712,46 +725,53 @@ _**Conceptual Question:** What can highly related pairs tell you? How do they re
 <br>
 
 
-## Self Exploration
-You have reached the end of the practical. If time permits, you can explore this [Shiny app]() which will allow you to simulate new genetic data and explore how different parameters (COI, migration, population size) affect IBD.  
+# Addendum {-}
+You have reached the end of the practical. This section contains advanced material and additional resources for interested participants. If time permits, you can explore the advanced material challenge, the challenge questions, and/or the further readings. 
 
-# Advanced/Extra
-This section contains advanced material and additional resources for interested participants.   
+### Coding Challenges 
+In this section, you will have the opportunity to explore and practice the skills above. 
+<br>
+Imagine that there are two populations: _A_ and _B_ with similar levels of falciparum incidence. However, there are only enough public health funds to intervene on one population. You have been asked by your National Malaria Control Programme (NMCP) to determine which population to intervene on. You first conduct a "travel survey" and determine that there are a high number of people that travel from _A_ to _B_. As a result, you hypothesis that _A_ is a "source" for _B_. Using the _VCF_ below, create a series of figure that you would present to your NMCP to encourage them to interview on population _A_ instead of _B_. Make sure to calculate IBD with multiple approaches to confirm your results. 
 
-## IBS & Polyclonality
+```{r}
+# participants DO NOT need to include the quiet bit
+ssvcf <- quiet(vcfR::read.vcfR("data/simulated_sink_source_ibd.vcf.gz"))
+```
+
+
+
+### Conceptual Challenges 
+#### IBS & Polyclonality
 Recently, [Tessema & Wesolowski et al. 2021](https://elifesciences.org/articles/43510) defined IBS for polyclonal samples as the proportion of sites that are identical divided by the potential alleles in all strains. Specifically, this can be expressed as for a pair of samples, $X$ and $Y$, the total number of shared alleles $S_{i}$ across the two samples divided by all alleles at that locus for sample $X$, $X_{i}$ and all alleles at that locus for sample $Y$, $Y_{i}$. This can be summed across all loci to produce an overall estimate of IBS.
 
 $$IBS=  \frac{1}{n} \sum_{i=1}^{n} \frac{S_{i}} {X_{i}Y_{i}} $$
 
 <br>
 <br>
-_**Question:** Can you think of a different approach to calculating IBS accounting for IBS that accounts for within-sample IBD? How woud you begin to accoutn for this?_
+_**Challenge Question:** Can you think of a different approach to calculating IBS accounting for IBS that accounts for within-sample IBD? How woud you begin to account for this? Please share your answer with an instructor!_
 <br>
 <br>
 
-## IBD & Polyclonality
+#### IBD & Polyclonality
 As was described in the case of `hmmIBD`, polyclonality greatly complicates IBD estimates and is an active area of research. Recent solutions include considering the malaria genome as diploid, which allows for heterozygous alleles: [`isoRelate`](https://github.com/bahlolab/isoRelate) or phasing polyclonal infections and estimating IBD from the resultant haplotypes: [deploidIBD](https://github.com/DEploid-dev/DEploid). This is an active area of research and remains a challenge within the malaria genomic epidemiology field.   
 
 <br>
 <br>
-_**Question:** How would you approach calculating IBD in a high-transmission region with numerous likely polyclonal infections? What advantages are there to phasing data? Are there other unpublished (not peer-reviewed) approaches for calculating IBD in polyclonal infections?_
+_**Challenge Question:** How would you approach calculating IBD in a high-transmission region with numerous likely polyclonal infections? What advantages are there to phasing data? Please share your answer with an instructor!_
+<br>
+<br>
+_**Challenge Question:** How would would the IBD estimates above change if you used [`isoRelate`](https://github.com/bahlolab/isoRelate). Try to use the program to determine if your hypotheses are correct._
 <br>
 <br>
 
-## Manipulating VCFs
-If time permits, check out [`vcftools`](https://vcftools.github.io/index.html). Try and subset our VCF to sample "A1" from the command line. Now try and subset to a single loci.   
-Manipulating VCFs on the command line is a key skill for a bioinformatician!  
-<br>
-<br>
-
-## HMMs
+### Further Reading 
+#### HMMs
 
 Hidden Markov models (HMMs) are a common statistical approach in population genetics, and for detecting IBD. For further reading, see [Rabiner 1989](https://web.mit.edu/6.435/www/Rabiner89.pdf).  
-
 <br>
 <br>
 
-## Coalescent Model
+#### Coalescent Theory
 
 Coalescent theory is one of the central pillars of population genetics and provides a framework for how loci (genes, individuals, etc.) have been derived from a common ancestor backwards in time, classically using the assumptions of the Wright-Fisher model. One of the main assumptions of the coalescence, is that loci are independent and that no recombination is occurring between loci. To relax this assumption, we must consider the coalescence with recombination. In this framework, a single coalescent tree is no longer representative of the genome (*NB*: genomes are now combination of genes on intervals [0, L) ; [L, L\_{+1}], see [Griffiths & Marjoram 1996](http://lamastex.org/recomb/ima.pdf) for further details). As a result, each loci in the gene interval has a marginal tree due recombination resulting in different genealogical histories of loci. The collection of these trees with respect to recombination breakpoints among loci in the gene interval is termed the Ancestral Recombination Graph (ARG). Relatedness is considered as the time to most recent common ancestor (TMRCA) for a given loci and gives a more refined estimate of relatedness versus the binary distinction of whether or not a specific segment of the genome is IBD (*as discussed in our lecture*).
 
@@ -761,7 +781,7 @@ Coalescent theory is one of the central pillars of population genetics and provi
 
 <br>
 
-For further reading, please refer to the following sources:   
+The following are an excellent launching point:   
 [Wakeley: Coalescent Theory: An Introduction](https://www.amazon.com/Coalescent-Theory-Introduction-John-Wakeley/dp/0974707759)\
 [Li & Stephens: 2003 PSMC](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1462870/)\
 [Li & Durbin: 2011 PSMC](https://pubmed.ncbi.nlm.nih.gov/21753753/)
