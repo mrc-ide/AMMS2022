@@ -18,95 +18,349 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = T, warning = F, message = F, 
+                      fig.align = 'center', fig.keep = 'all')
 ```
+<!-- Here we style out button a little bit -->
 
-# Dependencies for Practical {-}
+```{=html}
+<style>
+.showopt {
+background-color: #004c93;
+color: #FFFFFF; 
+width: 100px;
+height: 20px;
+text-align: center;
+vertical-align: middle !important;
+border-radius: 8px;
+float:right;
+}
+
+.showopt:hover {
+background-color: #dfe4f2;
+color: #004c93;
+}
+
+</style>
+```
+# Dependencies for Workshop {-}
+
+This is our first R-based activity. During the workshop we will be using functions that are available in "packages". Packages contain code, data and documentation in a standardized collection format that can be installed by users.
+We will download and install all packages needed for the workshop here. 
 
 Please copy and paste the below code chunk in it's entirety to your console to download R package libraries needed for this practical. If you are having trouble installing any of the R packages, please ask an instructor for a pre-loaded flash drive.
+
+If you are a Linux user and have trouble installing tidyverse, please ask an instructor for help.
 
 ```{r, class.source = "fold-show"}
 if (!("tidyverse" %in% installed.packages())) {
   install.packages("tidyverse",dependencies=T) 
-  # will need sudo apt-get install -y libxml2-dev libcurl4-openssl-dev libssl-dev
+}
+
+if (!("epitools" %in% installed.packages())) {
+  install.packages("epitools") 
+}
+
+if (!("UpSetR" %in% installed.packages())) {
+  install.packages("UpSetR")
 }
 ```
 
-Now load all of those libraries into this session using the code chunk below. Please copy and paste it in its entirety.
+
+# Dependencies for Practical {-}
+
+Now that we have installed packages, we are ready to load them so that we can call their functions and data.
+
+Please load all of these libraries (packages) into this session using the code chunk below. Please copy and paste it in its entirety.
 
 ```{r, class.source = "fold-show"}
 library(tidyverse)
+library(epitools)
+library(UpSetR)
 ```
 
 
-### Drug resistance data {-}
+# Familiarization with data and intro to prevalence estimation
 
-In this practical we will get familiar with genetic data using a drug resistance dataset to estimate prevalence. 
+## Overview 
+In this practical, we will get familiar with genetic data and with basic functions to summarize and visualize this data.
 
-### Practical Goals
+## Practical Goals
 By the end of this practical, you should be able to:
 - Import data to RStudio
+- Describe a genetic data set
+- Apply tidyverse functions to summarize data
+- Calculate prevalence from sample-based data
+- Visualize prevalence data
 - Construct a 95% confidence interval
-- Visualize drug resistance 
-- Interpret something
+- Visualize haplotype data 
 
-## Load data
+
+# Loading and summarizing genetic data
+
+## Overview of data
+
+Genetic data can be aggregated or on a per-sample basis. Information contained in a simple per-sample data set should include a sample identifier, locus information (position or some other identifier, reference and alternate sequence) and the abundance of reference and alternate sequences in that locus. Metadata can also be included. For samples we may want to know when and were they were collected, as well as any other relevant information. For loci, we may want to know, for example, the amino acid sequences that the codons code for. 
+
+In this practical, we will use a data set collected in the Democratic Republic of the Congo in 20?. We have simplified the original data set for instructional purposes. We will be looking at resistance-related mutations in the dhps gene.
+
+## Getting familiar with data
+Let's load the data set:
+
 ```{r}
-dr.data <- readRDS("outputs/DRC_DR1.rds")
+dr.data <- readRDS("outputs/DRC_DR2.rds")
 ```
 
-# Getting familiar with data
-What are the columns named in dr.data? 
-How many columns are there in dr.data?
-How many rows are there in dr.data?
+Can you see dr.data in your Environment?
+
+To get familiar with the data set, let's answer the following questions:
+
+
+**Q1.** How many rows and columns are there in dr.data? What are the column names?
+
+
+**A1.** 
 
 ```{r}
+ncol(dr.data) 
 colnames(dr.data)
-ncol(dr.data) # or length(colnames(dr.data))
 nrow(dr.data)
 ```
 
 
-# Summarize data
+We can see that we have 13 columns and 1617 rows. The columns contains a sample identifier (SAMPLE_ID) and sample metadata (REGION), as well as locus information (the rest of the columns).
+The last column is called REF_WSAF and it describes the proportion of reference sequences in a given locus and sample. 
 
-How many total samples are there?
+
+
+Now let's take a quick look at dr.data. Because dr.data has 1617 rows, it is too long to display, let's only display the first 10 rows
+
+```{r}
+dr.data[1:10,]
+```
+
+As you may be able to tell, each sample has multiple rows. This likely means that our data is in a long format, where the information for multiple loci for a sample is contained in different rows, instead of columns. 
+Also, there are some rows that show NA values in REF_WSAF. That means that in that sample, there is no information in that locus.
+
+**Q2.** Why would we want to store data in a long format?
+**A2.**
+
+
+Now, let's get more insights on what's contained in dr.data by answering the following questions: 
+
 How many codons are we looking at?
-How many samples per province are there?
+How many unique samples are there?
+How many samples per region are there?
 
+To summarize data, tools from the tidyverse library are very useful. Some of those tools include the distinct, unique, select, group_by and summarise functions. 
+  To get more information on a function, access the documentation using ?function. 
+  Copy "?distinct" in your console.
 
-
+Let's use the unique and length functions to identify how many samples there are in dr.data
 ```{r}
 
 samples <- unique(dr.data$SAMPLE_ID)
 
 length(samples)
 
-codons <- dr.data %>% 
-  select(GENE_NAME,CODON_NUM) %>% 
-  distinct()
-
-codons
-
-nrow(codons)
-
-dr.data.per.province <- dr.data %>% 
-  select(SAMPLE_ID,PROVINCE) %>% 
-  distinct() %>% 
-  group_by(PROVINCE) %>% 
-  summarise(n = n())
-
-View(dr.data.per.province)
 ```
 
 
-# Estimate prevalence
+Let's use the distinct function to identify how many and which codons are contained in dr.data. 
+```{r}
+# First, let's select relevant columns for this question: GENE_NAME, CODON_NUM
+dr.data.loci = dr.data[,c("GENE_NAME","CODON_NUM")]
+# Next, lets select distinct rows
+dr.data.loci = distinct(dr.data.loci)
+# let's display the result
+dr.data.loci 
+```
+
+We can see that there are 3 unique codons for gene dhps in the data set. 
+We performed two actions on dr.data: (1) we selected the relevant columns and (2) we selected only distinct rows from the data frame.
+We can also use pipes to perform sequential actions on an object. 
+
+```{r}
+dr.data.loci = dr.data %>% 
+  select(GENE_NAME,CODON_NUM) %>% 
+  distinct()
+
+dr.data.loci
+```
+
+
+Now let's use pipes and the select, distinct, group_by and summarise functions to get a count of samples per REGION
+```{r}
+
+dr.data.per.region <- dr.data %>% 
+  select(SAMPLE_ID,REGION) %>% 
+  distinct() %>% 
+  group_by(REGION) %>% 
+  summarise(n = n())
+
+dr.data.per.region
+
+```
+
+
+# Estimating prevalence
+
+In the next sections, you will be comparing results with other members of your group. 
+Each of you will focus on one codon:
+Participant 1: 437
+Participant 2: 540
+Participant 3: 581
+
+For drug resistance, the prevalence of a mutant is defined as the proportion of observations in a population that contain a mutation. Because malaria infections can be polyclonal, an individual can be infected with a mixture of strains that have the wild type or mutant alleles. Thus, we need to define how we will count observations. 
+One way of doing this is by counting the prevalence of wild type, mutant and mixed infections. 
+Alternatively, we can count each parasite as an observation (meaning that a polyclonal infection will count as multiple observations). 
+
+We will use the latter definition. 
+Let's first calculate the overall prevalence of drug resistant mutants in the country as a whole. 
+
+As we explained above, each sample has one row for each locus, and the REF_WSAF variable describes the proportion of reference (wild type) observations within a sample. REF_WSAF=1 means that the sample is exclusively wild type and REF_WSAF=0 means that it's exclusively mutant. Any value between 0 and 1 indicates that there is a mixture of both alleles in the sample. Thus, we can count wild type observations as those with REF_WSAF>0 and mutant observations with REF_WSAF<1.
+
+First, let's filter the data to contain the rows corresponding to your assigned codon and create 2 variables that denote whether the wild type and mutant alleles are present in the sample
+In the following code, please change the assigned_codon to your corresponding codon
+```{r}
+assigned_codon = 540
+dr.data.filtered <- dr.data %>% 
+  filter(CODON_NUM == assigned_codon) %>% 
+  mutate(REF_ALLELE = REF_WSAF>0)%>% 
+  mutate(ALT_ALLELE = REF_WSAF<1)
+```
+
+Let's calculate the total number of wild type observations 
+```{r}
+sum(dr.data.filtered$REF_ALLELE)
+```
+The value is NA because, as we explained above, some of the samples have no information for this locus, and most operations will return an NA if at least 1 value is NA. 
+We then, have to specify that we want to remove NAs:
+```{r}
+sum(dr.data.filtered$REF_ALLELE,na.rm = T)
+```
+
+Similarly, we can calculate the number of mutant observations:
+```{r}
+sum(dr.data.filtered$ALT_ALLELE,na.rm = T)
+```
+
+What is the prevalence of mutants in your codon? How does it compare to the other markers within your group?
+```{r}
+PREVALENCE = sum(dr.data.filtered$ALT_ALLELE,na.rm = T)/(sum(dr.data.filtered$ALT_ALLELE,na.rm = T)+sum(dr.data.filtered$REF_ALLELE,na.rm = T))
+PREVALENCE
+```
+
+Which marker has the highest prevalence?
+Which marker has the lowest prevalence?
 
 
 
+What is the prevalence of mutants in your codon in the two regions? How does it compare to the other markers within your group?
+```{r}
+dr.prevalence.region <- dr.data.filtered %>% 
+  group_by(REGION) %>% 
+  summarise(PREVALENCE = sum(ALT_ALLELE,na.rm = T)/(sum(ALT_ALLELE,na.rm = T)+sum(REF_ALLELE,na.rm = T)))
+dr.prevalence.region
+```
 
-# Construct CIs based on Wald's interval formula
+Now, let's also make a bargraph of your data:
 
-# Estimate CI using eppitools
+```{r}
+ggplot(data = dr.prevalence.region,
+       aes(x = REGION, y = PREVALENCE))+
+  geom_bar(stat="identity",position="dodge")
+```
+
+
+Where is prevalence higher, east or west?
+
+
+## Calculate confidence intervals
+
+As we will explain in the next session, a prevalence estimate has some uncertainty. Here, you will calculate the confidence interval using Wald's interval formula.
+The lower bound is calculated as:
+
+
+The upper bound is calculated as:
+
+Thus, we need to know the prevalence (p), sample size (N) and the level of confidence we want. 
+For this practical, we will calculate confidence levels at 95%, which means that z=1.96
+
+Let's first calculate the confidence interval for the country as a whole:
+
+```{r}
+PREVALENCE = sum(dr.data.filtered$ALT_ALLELE,na.rm = T)/(sum(dr.data.filtered$ALT_ALLELE,na.rm = T)+sum(dr.data.filtered$REF_ALLELE,na.rm = T))
+N = sum(dr.data.filtered$ALT_ALLELE,na.rm = T) + sum(dr.data.filtered$REF_ALLELE,na.rm = T)
+CI.LOWER = PREVALENCE - 1.96 * sqrt(PREVALENCE * (1 - PREVALENCE)/N)
+CI.UPPER = PREVALENCE + 1.96 * sqrt(PREVALENCE * (1 - PREVALENCE)/N)
+c(PREVALENCE,CI.LOWER,CI.UPPER)
+```
+Does your response to the question "What codon has a higher prevalence?" change now that you have seen confident intervals? 
+We will talk about uncertainty next!
+
+Now let's calculate the confidence intervals for the prevalence in each region, which will be easier with tidyverse tools:
+```{r}
+dr.prevalence.region <- dr.data.filtered %>% 
+  group_by(REGION) %>% 
+  summarise(PREVALENCE = sum(REF_WSAF<1,na.rm=T)/(sum(REF_WSAF<1,na.rm=T) + sum(REF_WSAF>0,na.rm=T)),
+            N = sum(REF_WSAF<1,na.rm=T) + sum(REF_WSAF>0,na.rm=T)) %>% 
+  mutate(ci.lower = PREVALENCE - 1.96 * sqrt(PREVALENCE * (1 - PREVALENCE)/N),
+         ci.upper = PREVALENCE + 1.96 * sqrt(PREVALENCE * (1 - PREVALENCE)/N))
+dr.prevalence.region
+```
+Does your response to the question "In which region is there higher prevalence?" change? What about the other codons in your group? 
+
+
+
+Now let's add that new information to our visualization:
+```{r}
+ggplot(data = dr.prevalence.region,
+       aes(x = REGION, y = PREVALENCE,ymin=ci.lower,ymax=ci.upper))+
+  geom_bar(stat="identity",position="dodge")+
+  geom_errorbar()
+```
+
+
+
+## Integrating data from multiple codons
+
+Now that each of you has worked on a codon independently, it's time to put all of them together in one figure:
+```{r}
+dr.data.grouped.wald <- dr.data %>% 
+  group_by(CODON_NUM,REGION) %>% 
+  summarise(PREVALENCE = sum(REF_WSAF<1,na.rm=T)/(sum(REF_WSAF<1,na.rm=T) + sum(REF_WSAF>0,na.rm=T)),
+            N = (sum(REF_WSAF<1,na.rm=T) + sum(REF_WSAF>0,na.rm=T))) %>% 
+  mutate(ci.lower = PREVALENCE - 1.96 * sqrt(PREVALENCE * (1 - PREVALENCE)/N),
+         ci.upper = PREVALENCE + 1.96 * sqrt(PREVALENCE * (1 - PREVALENCE)/N)) 
+
+ggplot(data = dr.data.grouped.wald,
+       aes (fill = REGION,
+            y = PREVALENCE,
+            x = factor(CODON_NUM),
+            ymin = ci.lower,
+            ymax = ci.upper))+
+  geom_bar(stat="identity",position="dodge")+
+  geom_errorbar(position="dodge")
+```
+
+
 
 # Plot DR combinations using UpSet
 
+```{r}
+
+
+```
+
+Advanced (long exercise)
+# Estimate CI using epitools' binom.exact()
+
+```{r}
+dr.data.grouped.binom.exact <- dr.data %>% 
+  group_by(CODON_NUM,REGION) %>% 
+  summarise(X = sum(REF_WSAF<1,na.rm=T),
+            N = (sum(REF_WSAF<1,na.rm=T) + sum(REF_WSAF>0,na.rm=T))) %>% 
+  mutate(ci = binom.exact(X,N,conf.level = 0.95))
+```
+Advanced: calculate how many samples have more than 1 allele
