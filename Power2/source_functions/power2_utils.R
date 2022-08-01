@@ -7,7 +7,7 @@ barplot_clusters <- function(cluster_prev) {
     mutate(q = 1 - p) %>%
     pivot_longer(-cluster) %>%
     ggplot() + theme_bw() +
-    geom_bar(aes(x = cluster, y = (1 - value) * 100, fill = name), position = "stack", stat = "identity") +
+    geom_bar(aes(x = as.factor(cluster), y = (1 - value) * 100, fill = name), position = "stack", stat = "identity") +
     scale_fill_manual(values = c(grey(0.8), "coral1"), guide = "none") +
     xlab("Cluster") + ylab("Prevalance")
 }
