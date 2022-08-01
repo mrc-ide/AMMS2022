@@ -66,6 +66,7 @@ if (any(deps)) {
     devtools::install_github("bobverity/rmaverick", ref = "v1.1.0")
   }
 }
+
 ```
 
 Now load all of those libraries into this session using the code chunk below. Please copy and paste it in its entirety.
@@ -86,7 +87,20 @@ source("source_functions/pop_structure_utils.R")
 
 # Intro to population structure and allele frequency metrics {-}
 
-One of the most fundamental observations that we can make from genetic data is how the frequencies of different alleles vary over time and over space. For loci where mutations confer drug resistance, allele frequencies tell us something with direct clinical implications - if an allele is at high frequencies then we might consider switching first-line drugs. However, even for loci that have no direct impact on phenotype, and therefore are selectively neutral, allele frequencies can give us important information about what is going on in the parasite population. These loci will be influenced by factors such as prevalence, human and mosquito population size, and migration rates between different sub-populations. If we can correctly interpret these signals then we can use neutral allele frequencies to tell us things about population structure and connectivity that can be relevant for control purposes.
+
+One of the most fundamental observations that we can make from genetic data is how the frequencies of different alleles vary over time and over space.
+
+For loci where mutations confer drug resistance, allele frequencies tell us something with direct clinical implications - if an allele is at high frequencies then we might consider switching first-line drugs.
+
+However, even for loci that have no direct impact on phenotype, and therefore are selectively neutral, allele frequencies can give us important information about what is going on in the parasite population. 
+
+These loci will be influenced by factors such as prevalence, human and mosquito population size, and migration rates between different sub-populations. If we can correctly interpret these signals then we can use neutral allele frequencies to tell us things about population structure and connectivity that can be relevant for control purposes.
+
+_**Definition:** An allele is the identity of a particular genetic locus or sequence that is inherited between parents and offspring._
+
+_**Definition:** A locus is a fixed position on a chromosome where a particular genetic marker is located._
+
+_**Definition:** A neutral allele is one which is not positively or negatively affecting an organism's fitness and undergoing selection._
 
 ### Overview of Data {-}
 
@@ -96,7 +110,7 @@ We will work with both simulated and real data in this practical. The simulated 
 By the end of this practical, you should be able to: 
 
 - Describe how population size, mutation and migration rates affect the patterns that we expect to see in neutral allele frequency data
-- Estimate metrics such as FST and explain what they can tell us about population differentiation
+- Estimate metrics such as $F_{ST}$ and explain what they can tell us about population differentiation
 - Use ordination techniques like PCA to explore patterns of population structure
 - Use model-based techniques like *rmaverick* to detect population structure in a probability-driven way
 - Appreciate how allele frequency methods can identify connectivity over large spatial scales and long temporal scales
@@ -107,19 +121,24 @@ By the end of this practical, you should be able to:
 
 # Population genetics through simulation {-}
 
-Explanation of the term "deme"?
+First we will simulate a population and different frequencies of alleles. To do this we will use an R function called sim_freqs to generate allele frequencies.
 
 ## Focusing on a single subpopulation {-}
 
+Let's consider a single subpopulation (e.g. village) where there is no barrier to gene flow, also known as a "deme". 
+
 ### Allele frequency changes in a single deme {-}
 
-Try running this function lots of times. What do you notice about the allele frequency over time?
+First we will simulate the allele frequencies of a population of 1000 individuals infected with malaria. Try running this function lots of times. What do you notice about the allele frequency over time?
 
 ```{r}
 sim1 <- sim_freqs(N = 1000, mut_rate = 0)
+
 ```
 
 Now repeat with a smaller population size (which represents the number of *infected* hosts in our case). What do you notice about the strength of drift? What happens once an allele reaches a frequency of 0 or 1? Why is this?
+
+_**Definition:** Drift is the variation in the frequency of alleles in a small population due to the random loss of alleles across generations._
 
 ```{r}
 sim_freqs(N = 100, mut_rate = 0)
@@ -155,6 +174,8 @@ What happens if you increase the mutation rate? What happens if you increase the
 
 Run the code below multiple times to repeat the simulation of drift, but now also plotting homozygosity. What do you notice about how homozygosity changes over time? (It always increases to 1).
 
+_**Definition:** Homozygosity is the existence of identical allleles at a given locus._
+
 ```{r}
 sim_freqs(N = 1000, t_out = seq(0, 365 * 10, 7), plot_homo = TRUE)
 ```
@@ -172,16 +193,29 @@ sim_freqs(N = 1000, t_out = seq(0, 365 * 5, 7), mut_rate = 1e-4, plot_homo = TRU
 ```
 
 ## Multiple subpopulations {-}
+Now we will consider an example with multiple subpopulations (demes).
 
 ### Perfectly isolated subpopulations {-}
 
-Try running 10 independent subpopulations. Notice that allele frequencies tend to diverge
+Try running a simulation with 10 independent demes.This could represent ten villages where there is no movement of people between those villages. Notice that allele frequencies tend to diverge.
 
 ```{r}
 sim1 <- sim_freqs(N = 1000, demes = 10, mig_rate = 0, mut_rate = 1e-4)
 ```
 
-We can calculate a simple version of Fst manually
+#### Calculating $F_{ST}$ to measure population differentiation{-}
+
+Next we will explore a metric used to measure population differentiation.
+
+_**Definition:** Fixation index, or $F_{ST}$ and Jost's D are both measures of genetic differentiation between different subpopulations._
+
+When $F_{ST}$ is close to **1** it means that individuals in a population tend to carry a _small number of alleles_. Individuals are “differentiated” in the sense that alleles are not freely mixing between people.
+
+
+High values of $F_{ST}$ and Jost's D both suggest a greater genetic differentiation between the subpopulations being measured. However both metrics have different approaches to measure genetic differentiation. 
+
+
+We can calculate a simple version of $F_{ST}$ manually
 
 ```{r}
 sim_fst <- sim1$data %>%
@@ -192,7 +226,7 @@ sim_fst <- sim1$data %>%
             Fst = p_var / (p_mean * (1 - p_mean)))
 ```
 
-Now lets plot Fst over time. What do you notice about differentiation?
+Now lets plot $F_{ST}$ over time. What do you notice about differentiation?
 
 ```{r}
 ggplot(sim_fst) +
@@ -216,16 +250,18 @@ sim1$data %>%
   expand_limits(y = c(0, 1))
 ```
 
-The equilibrium level of Fst is known to be 1/(1 + 2*N*mu) in this case. How does this level compare with what you saw in the plot?
+The equilibrium level of $F_{ST}$is known to be 1/(1 + 2*N*mu) in this case. How does this level compare with what you saw in the plot?
 
 ```{r}
 # e.g. use
 #geom_hline(yintercept = 1 / (1 + 2*1e2*1e-3), linetype = "dashed")
 ```
 
-The fact that Fst depends on the mutation rate can lead to problems. If one marker has a high mutation rate (e.g. microsat) then we would expect to see low values of Fst, even if the populations have been evolving separately for a long time, and in this sense are well differentiated.
+The fact that $F_{ST}$ depends on the mutation rate can lead to problems. If one marker has a high mutation rate (e.g. microsatellites) then we would expect to see low values of $F_{ST}$, even if the populations have been evolving separately for a long time, and in this sense are well differentiated.
 
 Jost's D is an alternative way of looking at differentiation.
+
+When Jost's D is close to **1** it means that alleles tend to be present in _a small number of individuals_. Individuals are “differentiated” in the sense that they contain different genetic material.
 
 ```{r}
 sim1 <- sim_freqs(N = 100, demes = 10, mig_rate = 0, mut_rate = 1e-3,
@@ -242,9 +278,9 @@ sim1$data %>%
   expand_limits(y = c(0, 1.2))
 ```
 
-Jost's D does not suffer from the same problem as Fst, but it suffers from a different problem - it assumes infinite alleles mutation. When we have a biallelic SNP, Jost's D will tend to reach values of around 0.5 at equilibrium. (This is actually a bit of a subtle point - maybe easier to understand if I generalise the above to allow more than two alleles?)
+Jost's D does not suffer from the same problem as $F_{ST}$, but it suffers from a different problem - it assumes infinite alleles mutation. When we have a biallelic SNP, Jost's D will tend to reach values of around 0.5 at equilibrium. (This is actually a bit of a subtle point - maybe easier to understand if I generalise the above to allow more than two alleles?)
 
-Conclusion - both Fst and D have their limitations. Fst is good when mutation rates are low, for example biallelic SNPs. Jost's D is good for highly diverse and fast-mutating sites, such as microsats.
+In conclusion, both $F_{ST}$ and D have their limitations. $F_{ST}$ is good when mutation rates are low, for example biallelic SNPs. Jost's D is good for highly diverse and fast-mutating sites, such as microsats.
 
 
 ### Connected subpopulations {-}
@@ -255,7 +291,7 @@ What happens when we connect our demes up by migration? Try experimenting with l
 sim_freqs(N = 1000, demes = 5, mig_rate = 0.01)
 ```
 
-Lets look at what happens to Fst when we include migration. What happens when you increase/decrease the migration rate?
+Lets look at what happens to $F_{ST}$ when we include migration. What happens when you increase/decrease the migration rate?
 
 ```{r}
 sim1 <- sim_freqs(N = 1000, demes = 10, t_out = seq(0, 365*20, 7), mig_rate = 1e-3,
@@ -272,9 +308,9 @@ sim1$data %>%
   geom_hline(yintercept = 1 / (1 + 2*1e3*(1e-3 + 1e-6)), linetype = "dashed")
 ```
 
-Theory tells us that the equilibrium level of Fst in this situation is given by 1/(1 + 2*N*(m + mu)). Does this result hold up this your simulations? (yes, on average). Note that migration rates are usually much larger than mutation rates, meaning we can often simplify this to 1/(1 + 2*N*m).
+Theory tells us that the equilibrium level of $F_{ST}$ in this situation is given by 1/(1 + 2*N*(m + mu)). Does this result hold up this your simulations? (yes, on average). Note that migration rates are usually much larger than mutation rates, meaning we can often simplify this to 1/(1 + 2*N*m).
 
-Conclusion - at equilibrium, Fst reaches a level that is a balance between the strength of genetic drift (i.e. small population size) and migration. The higher the migration rate, the lower the value of Fst. This means we can use Fst to tell us something about the connectivity of populations. Small pairwise Fst tends to indicate highly connected populations and vice versa.
+Conclusion - at equilibrium, $F_{ST}$ reaches a level that is a balance between the strength of genetic drift (i.e. small population size) and migration. The higher the migration rate, the lower the value of $F_{ST}$. This means we can use $F_{ST}$ to tell us something about the connectivity of populations. Small pairwise $F_{ST}$ tends to indicate highly connected populations and vice versa.
 
 Note, however, that these patterns take a very long time to build up. So we are not talking about the timescale of control programmes, but more of an evolutionary timescale.
 
@@ -282,7 +318,9 @@ Note, however, that these patterns take a very long time to build up. So we are 
 
 # Analysis of DRC data {-}
 
-Load the DRC MIP data. This data is a slightly simplified version of that used in the NatComms paper.
+Now we will explore allele frequencies in a real dataset. First, we will load a dataset collected using Molecular Inversion Probes (MIPs) which are a method of high throughput sequencing. This dataset consists of 2537 samples collected in 2013–2015 from the DRC and surrounding countries. 
+ 
+ This data is a slightly simplified version of that used in this paper : [Verity et al. 2020](https://pubmed.ncbi.nlm.nih.gov/32355199/).
 
 ```{r, echo=FALSE, eval=FALSE}
 # Code to process raw data from DRC paper. This code block does not need to be run by the user.
@@ -333,7 +371,12 @@ MIP_data_noDRC <- MIPanalyzer::filter_samples(MIP_data, MIP_data$samples$Country
 MIP_data_noDRC
 ```
 
-Now lets do PCA on the within-sample allele frequencies
+
+## PCA of DRC data {-}
+
+Principal Components Analysis or PCA can be used to reduce the number of dimensions or variables in a dataset, and can be used to more easily summarize data and in this case visualise genetic differentiation. 
+
+Now lets do PCA on the within-sample allele frequencies.
 
 ```{r}
 wsaf_impute <- MIPanalyzer::get_wsaf(MIP_data_noDRC, impute = TRUE, FUN = mean)
@@ -347,7 +390,7 @@ ggplot(plot_df) + theme_bw() +
   geom_point(aes(x = PC1, y = PC2, color = Country))
 ```
 
-We see well-separated clusters, which makes sense geographicall. Now let's repeat the process using all samples including those from DRC.
+We see well-separated clusters, which makes sense geographically. Now let's repeat the process using all samples including those from DRC.
 
 ```{r}
 wsaf_impute <- MIPanalyzer::get_wsaf(MIP_data, impute = TRUE, FUN = mean)
@@ -384,7 +427,9 @@ MIPanalyzer::plot_pca_contribution(pca, component = 2, chrom = MIP_data$loci$CHR
 
 # Inferring population structure using *rmaverick* {-}
 
-Load barcode data from Amy Bei's 2018 paper. This data has already been filtered to remove the two Thies samples, and to order in terms of date (2001-2002 vs. 2014) and location (Dielmo and Ndiop)
+*rmaverick* is an R package which we will use to further investigate population structure.  
+
+First we will load genetic barcode data from [Bei et al., 2018](https://pubmed.ncbi.nlm.nih.gov/29325146/ ) . This study contains samples taken at two separate time points over ten years apart in two locations in Senegal.  These data have already been filtered to remove the two Thies samples, and to order in terms of date (2001-2002 vs. 2014) and location (Dielmo and Ndiop). 
 
 ```{r, echo=FALSE, eval=FALSE}
 # code not run - this is how I get the raw data from SIMPLEGEN and process it
@@ -406,7 +451,10 @@ Bei_2018_processed$SNP_locations <- as.data.frame(Bei_2018_processed$SNP_locatio
 save(Bei_2018_processed, file = "data/Bei_2018_processed.RData")
 ```
 
-Give a snapshot of the data, which includes measures of transmission intensity in the two timepoints and regions
+ Now let's look at a snapshot of the data, which includes measures of transmission intensity in the two timepoints and regions. We will look at:
+ - Entomological Innoculation Rate (EIR)
+ - The barcodes
+ - The SNP locations
 
 ```{r}
 load("data/Bei_2018_processed.RData")
@@ -433,7 +481,7 @@ for (i in 8:31) {
 head(mav_data)
 ```
 
-Load the data into *rmaverick*, and make a first model set. Print the project to check everything looks as planned (25 samples, 24 loci etc.)
+Next, load the data into *rmaverick*, and set up our first model. Then print the project to check everything looks as planned (25 samples, 24 loci etc.)
 
 ```{r}
 myproj <- rmaverick::mavproject() %>%
@@ -443,7 +491,9 @@ myproj <- rmaverick::mavproject() %>%
 myproj
 ```
 
-Run MCMC. Users should run this with pb_markdown = FALSE.
+Markov Chain Monte Carlo (MCMC) approaches allow us to fit models by sampling from complex probability distributions. Here we will use MCMC to fit our model in rmaverick. 
+
+Let's run an MCMC in rmaverick. Users should run this with pb_markdown = FALSE.
 
 ```{r}
 myproj <- rmaverick::run_mcmc(myproj, K = 1:8, burnin = 1e3, samples = 1e3,
@@ -451,20 +501,30 @@ myproj <- rmaverick::run_mcmc(myproj, K = 1:8, burnin = 1e3, samples = 1e3,
 
 ```
 
-Some MCMC diagnostic checks. First, check that coupling rates are above 0. Do this for every value of K from 2 to the max value explored.
+First we will carry out some MCMC diagnostic checks. Check that coupling acceptance rates are above 0. Do this for every value of K (the number of subpopulations) from 2 to the max value explored.
+
+
+
+[Question for Bob - is rmaverick MCMCMC? Not sure how far to get into the diagnostics but I think more explanation required.]
+
+_**Definition:** Coupling acceptance rates are the rates of proposals in the MCMC which are accepted._
+
+_**Definition:** The K value is the number of subpopulations in rmaverick._
+
 
 ```{r}
 rmaverick:::plot_mc_acceptance(myproj, K = 8)
 ```
 
-Now check what the program things about the best value of K. In this case, values around 3-5 are reasonably likely
+
+Now check what the program thinks about the best value of K. In this case, values around 3-5 are reasonably likely
 
 ```{r}
 rmaverick::plot_logevidence_K(myproj)
 rmaverick::plot_posterior_K(myproj)
 ```
 
-Produce Structure plot. Add vertical lines to break up into the following groups:
+Finally,  we will produce a STRUCTURE plot. This plot shows differences in the distribution of genetic variants amongst populations  We will add vertical lines to break up into the following groups:
 1. Dielmo 2001-2001
 2. Ndiop  2001-2002
 1. Dielmo 2014
@@ -475,8 +535,17 @@ rmaverick::plot_qmatrix(myproj, K = 3:5) +
   geom_vline(xintercept = c(4, 10, 16) + 0.5, size = 1)
 ```
 
-Notive that the later samples are (mostly) clearly allocated to one or other population with high probability. These essentially represent clonal lineages. We can see that groups 2,3,4 are present in Dielmo in 2014, and in Ndiop we additionally have group 1.
+
+
+Notice that the later samples are (mostly) clearly allocated to one or other population with high probability. These essentially represent clonal lineages. We can see that groups 2,3,4 are present in Dielmo in 2014, and in Ndiop we additionally have group 1.
+
 Comparing this to the earlier time point, samples are far more ambigious in their allocation. They look a bit like some of these clonal lineages, but it's not clear cut, probably because there is some additional variation. Interestingly, group 4 dominates in Ndiop in 2001-2002. This lineage is almost completely lost by the later sampling point.
+
 Overall, we can see evidence of increasing population structure over time. Compare this with the EIR values - what do you notice? (lower transmission later in time, therefore increasing differentiation and population structure).
 
 -------------------------
+
+ConcludiCCCquncluding questions to summarize:
+1. What can allele frequencies tell us about population differentiation?
+2. What does $F_{ST}$ tell us and what are its limitations?
+3. When is population structure more ambiguous when using allele frequencies?
