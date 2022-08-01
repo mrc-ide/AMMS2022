@@ -345,13 +345,38 @@ ggplot(data = dr.data.grouped.wald,
 ```
 
 
+# Visualizing haplotypes
 
-# Plot DR combinations using UpSet
+As we discussed in the lecture, for some drugs the combination of alleles (haplotypes) is the most relevant information. Next, we will use a packge, UpSetR, to visualize combinations of mutations. 
 
+Documentation on the package can be found here:
+https://cran.r-project.org/web/packages/UpSetR/UpSetR.pdf
+
+
+Polyclonal data presents a challenge for haplotypes: if a sample contains 2 alleles for 2 loci, which allele goes with which in each of the parasites in that infection? 
+To simplify our data set, we will remove samples with NAs and consider only the most abundant allele in each sample
 ```{r}
 
+dr.data.NA = dr.data %>% 
+  group_by(SAMPLE_ID) %>% 
+  summarise(na = !any(is.na(REF_WSAF)))
 
+dr.data.simplified <- dr.data %>% 
+  mutate(REF_WSAF_ROUND = round(REF_WSAF)) %>% 
+  filter(SAMPLE_ID %in% (dr.data.NA %>% filter(na))$SAMPLE_ID)
 ```
+
+
+
+```{r}
+dr.data.simplified %>%
+  select(SAMPLE_ID,CODON_NUM,REF_WSAF_ROUND) %>% 
+  pivot_wider(names_from = CODON_NUM , values_from = REF_WSAF_ROUND) %>% 
+  mutate(haplotype = paste(`437`,`540`,`581`)) %>% 
+  group_by(haplotype) %>%  
+  summarize( n = n())
+```
+
 
 Advanced (long exercise)
 # Estimate CI using epitools' binom.exact()
