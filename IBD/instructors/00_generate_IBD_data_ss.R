@@ -8,7 +8,7 @@
 ## Notes: Apologies, package is still undergoing changes and I may break it before AMMS.
 ## This commit works for our purposes
 ## .................................................................................
-remotes::install_github("nickbrazeau/polySimIBD", ref = "b01025d9b57d80cad0d972993486f74ddec680f3")
+remotes::install_github("nickbrazeau/polySimIBD", ref = "develop")
 library(polySimIBD)
 library(vcfR)
 library(tidyverse)
@@ -19,18 +19,15 @@ set.seed(48)
 #...........................................................
 # vectors must be ordered for population A, B, C, D, E
 ds <- 12
-demesizes <- rep(ds,5)
+demesizes <- rep(ds,2)
 dwnsmpl <- split(cumsum(demesizes), f = 1:length(demesizes))
 dwnsmpl <- sort(unlist(lapply(dwnsmpl, function(x,ds)sample((x-ds):x, size = 5), ds = ds)))
-coimeans <- c(4, 1.5, 2.75, 1.25, 1)
-m <- rep(0.25, 5)
+coimeans <- c(1,1)
+m <- rep(0.25, 2)
 # make symmetrical
-migr_dist_mat <- matrix(c(100,20,20,30,0,
-                          20,100,15,30,0,
-                          20,20,100,2,0,
-                          30,30,2,100,0,
-                          0,0,0,0,100),
-                        ncol = 5, nrow = 5)
+migr_dist_mat <- matrix(c(1, 0,
+                          2, 1),
+                        ncol = 2, nrow = 2)
 swfsim <- polySimIBD::sim_swf(pos = sort(sample(1:1e3, size = 50)),
                               N = demesizes,
                               m = m,
@@ -55,7 +52,7 @@ reads <- polySimIBD::sim_biallelic(COIs = this_coi,
                                    coverage = 100,
                                    alpha = 1,
                                    overdispersion = 0.1,
-                                   epsilon = 0.05)
+                                   epsilon = 0.01)
 # convert to VCF
 make_vcf_from_reads <- function(reads, swfsim) {
   # checks
@@ -106,9 +103,9 @@ make_vcf_from_reads <- function(reads, swfsim) {
 
 simVCF <- make_vcf_from_reads(reads, swfsim)
 # manually write over smpl names for participant convenience
-colnames(simVCF@gt)[2:ncol(simVCF@gt)] <- unlist(lapply(LETTERS[1:5], function(x) paste0(x, 1:5)))
+colnames(simVCF@gt)[2:ncol(simVCF@gt)] <- c(paste0("A", 1:5), paste0("B", 1:5))
 # save out
-vcfR::write.vcf(simVCF, file = "data/simulated_ibd.vcf.gz")
+vcfR::write.vcf(simVCF, file = "data/simulated_sink_source_ibd.vcf.gz")
 
 
 #............................................................

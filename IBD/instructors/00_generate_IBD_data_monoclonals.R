@@ -8,7 +8,7 @@
 ## Notes: Apologies, package is still undergoing changes and I may break it before AMMS.
 ## This commit works for our purposes
 ## .................................................................................
-remotes::install_github("nickbrazeau/polySimIBD", ref = "b01025d9b57d80cad0d972993486f74ddec680f3")
+remotes::install_github("nickbrazeau/polySimIBD", ref = "develop")
 library(polySimIBD)
 library(vcfR)
 library(tidyverse)
@@ -20,9 +20,7 @@ set.seed(48)
 # vectors must be ordered for population A, B, C, D, E
 ds <- 12
 demesizes <- rep(ds,5)
-dwnsmpl <- split(cumsum(demesizes), f = 1:length(demesizes))
-dwnsmpl <- sort(unlist(lapply(dwnsmpl, function(x,ds)sample((x-ds):x, size = 5), ds = ds)))
-coimeans <- c(4, 1.5, 2.75, 1.25, 1)
+coimeans <- c(4, 1.5, 2.75, 1.25, 1)/1.5
 m <- rep(0.25, 5)
 # make symmetrical
 migr_dist_mat <- matrix(c(100,20,20,30,0,
@@ -40,6 +38,44 @@ swfsim <- polySimIBD::sim_swf(pos = sort(sample(1:1e3, size = 50)),
                               tlim = 10)
 
 #......................
+# downsample as many as possible lot of monoclonals
+#......................
+d1 <- which(swfsim$coi[1:12] == 1)
+while(length(unique(d1))<5){d1 <- c(d1, sample(1:12, 1))}
+d1 <- sort(unique(d1))
+d1
+
+d2 <- which(swfsim$coi[13:24] == 1) + 12
+while(length(unique(d2))<5){d2 <- c(d2, sample(13:24, 1))}
+d2 <- sort(unique(d2))
+d2
+
+d3 <- which(swfsim$coi[25:36] == 1) + 24
+while(length(unique(d3))<5){d3 <- c(d3, sample(25:36, 1))}
+d3 <- sort(unique(d3))
+d3
+
+d4 <- which(swfsim$coi[37:48] == 1) + 36
+if(length(d4) > 5){
+  d4 <- d4[1:5]
+} else {
+  while(length(unique(d4))<5){d4 <- c(d4, sample(37:48, 1))}
+  d4 <- sort(unique(d4))
+  d4
+}
+
+d5 <- which(swfsim$coi[49:60] == 1) + 48
+if (length(d5) > 5) {
+  d5 <- d5[1:5]
+} else {
+  while(length(unique(d5))<5){d5 <- c(d5, sample(49:60, 1))}
+  d5 <- sort(unique(d5))
+}
+
+dwnsmpl <- c(d1,d2,d3,d4,d5)
+dwnsmpl <- sort(unique(dwnsmpl))
+
+#......................
 # lift over into VCF
 #......................
 # get arg
@@ -55,7 +91,7 @@ reads <- polySimIBD::sim_biallelic(COIs = this_coi,
                                    coverage = 100,
                                    alpha = 1,
                                    overdispersion = 0.1,
-                                   epsilon = 0.05)
+                                   epsilon = 0.001)
 # convert to VCF
 make_vcf_from_reads <- function(reads, swfsim) {
   # checks
