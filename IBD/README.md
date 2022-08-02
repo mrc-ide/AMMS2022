@@ -8,7 +8,7 @@ Below is an outline of the Github repository relevant for the practical.
 ├── README.md
 ├── R                   # Useful practical functions
 ├── R_ignore            # ignore (practical images)
-├── data                # Genetic, spatial, and metada data
+├── data                # Genetic, spatial, and meta- data
 ├── misc                # ignore
 ├── calculating_IBS_IBD.Rmd
 ├── calculating_IBS_IBD.html
