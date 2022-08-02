@@ -1,6 +1,6 @@
 # AMMS Identity by State and by Descent Practical 2022
 ## Overview of Repo
-Below is an outline of the Github repository relevant ot the practical.
+Below is an outline of the Github repository relevant for the practical.
 
 ```
 ├── HY_Manuscripts      # High yield manuscripts for review
