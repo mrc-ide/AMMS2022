@@ -120,47 +120,62 @@ By the end of this practical, you should be able to:
 -------------------------
 
 # Population genetics through simulation {-}
+In this section, we will simulate various populations with different frequencies of alleles be using the R function: `sim_freqs`. Note, this function was loaded from `source_functions/pop_structure_utils.R`. 
 
-First we will simulate a population and different frequencies of alleles. To do this we will use an R function called sim_freqs to generate allele frequencies.
+## Single subpopulation {-}
 
-## Focusing on a single subpopulation {-}
-
-Let's consider a single subpopulation (e.g. village) where there is no barrier to gene flow, also known as a "deme". 
+Let's first consider a **single** subpopulation (e.g. village) where there is no barrier to gene flow, also known as a "deme". As a result, a deme is a group of individuals (*e.g.* parasites) that can freely interbreed. 
 
 ### Allele frequency changes in a single deme {-}
 
-First we will simulate the allele frequencies of a population of 1000 individuals infected with malaria. Try running this function lots of times. What do you notice about the allele frequency over time?
+First we will simulate the allele frequencies of a population of 1000 individuals infected with malaria. 
 
 ```{r}
-sim1 <- sim_freqs(N = 1000, mut_rate = 0)
+# Note, participants should not include the quiet() function - run: sim_freqs(N = 1000, mut_rate = 0)
+sim1 <- quiet(sim_freqs(N = 1000, mut_rate = 0))
 
 ```
+_**Question/Coding Challenge**_: Try running this function lots of times. What do you notice about the allele frequency over time?
 
-Now repeat with a smaller population size (which represents the number of *infected* hosts in our case). What do you notice about the strength of drift? What happens once an allele reaches a frequency of 0 or 1? Why is this?
+_**Question/Coding Challenge**_: Now repeat with a smaller population size (which represents the number of *infected* hosts in our case); for example, `N=500`, `N=100`, and `N=50`. What do you notice about the strength of drift? What happens once an allele reaches a frequency of 0 or 1? Why is this?
+
+```{r}
+# Note, participants should not include the quiet() function 
+quiet(sim_freqs(N = 100, mut_rate = 0))
+```
 
 _**Definition:** Drift is the variation in the frequency of alleles in a small population due to the random loss of alleles across generations._
 
-```{r}
-sim_freqs(N = 100, mut_rate = 0)
-```
+Next, we will explore how our simulation of a single, larger subpopulation changes when adding mutations and considering the population for some time. 
 
-Now repeat the simulation, this time running for 10 years and with some mutation. Do frequencies still always end up fixed/lost?
+_**Question/Coding Challenge**_: Now repeat the simulation, this time running for 10 years and with some mutation. Do frequencies still always end up fixed/lost?
 
 ```{r}
-sim_freqs(N = 1000, t_out = seq(0, 365 * 10), mut_rate = 1e-4)
+# Note, participants should not include the quiet() function 
+quiet(sim_freqs(N = 1000, t_out = seq(0, 365 * 10), mut_rate = 1e-4))
 ```
 
-### The allele frequency spectrum {-}
+_**Question/Coding Challenge**_: Now repeat the simulation, but alter the mutation rate to be higher and lower respectively. How do the results change from above? (Example options are provided in the chunks below)
+```{r, eval=F}
+sim_freqs(N = 1000, t_out = seq(0, 365 * 10), mut_rate = 1e-2)
+```
 
-We will now simulate a large number of loci, but output at just a single timepoint.
+```{r, eval=F}
+sim_freqs(N = 1000, t_out = seq(0, 365 * 10), mut_rate = 1e-10)
+```
+
+### The allele frequency distribution {-}
+We will now simulate a large number of loci, but output will just consider a single timepoint: 5 years from the origin of our single subpopulation. Note, we will be using a moderate mutation rate as compared to the ones we considered above. 
 
 ```{r}
 # simulate allele frequencies and look at the data
-sim1 <- sim_freqs(N = 1000, t_out = 365 * 5, mut_rate = 1e-6, loci = 1e3, plot_on = FALSE)
+sim1 <- quiet(sim_freqs(N = 1000, t_out = 365 * 5, mut_rate = 1e-6, loci = 1e3, plot_on = FALSE))
 head(sim1$data)
 ```
+<br>
+We can plot this allele frequency spectrum.  
 
-We can plot this allele frequency spectrum
+_**Coding Challenge**_: Using the simulated data located in the `sim1$data` dataframe, make a histogram  with ggplot and the `geom_histogram` layer of the allele frequencies distributions. You can add breaks in the histogram using the following code: `breaks = seq(0, 1, 0.01)`.   
 
 ```{r}
 # simulate allele frequencies and look at the data
@@ -168,54 +183,82 @@ ggplot(sim1$data) +
   geom_histogram(aes(x = freq), breaks = seq(0, 1, 0.01))
 ```
 
-What happens if you increase the mutation rate? What happens if you increase the population size?
+_**Question/Coding Challenge**_: What happens if you increase the mutation rate? What happens if you increase the population size? Example code chunks are provided below. 
+```{r}
+sim2 <- sim_freqs(N = 1e5, t_out = 365 * 5, mut_rate = 1e-6, loci = 1e3, plot_on = FALSE)
+```
+```{r}
+sim3 <- sim_freqs(N = 1000, t_out = 365 * 5, mut_rate = 1e-3, loci = 1e3, plot_on = FALSE)
+```
+_**Coding Challenge**_: Can you write a function that pipes the simulation output directly into code that makes similar histogram plots above?  
+
+<br>
+<br>
 
 ### The buildup of homozygosity {-}
-
-Run the code below multiple times to repeat the simulation of drift, but now also plotting homozygosity. What do you notice about how homozygosity changes over time? (It always increases to 1).
-
+Now we will analyze how homozygosity changes over time in the setting of drift. 
 _**Definition:** Homozygosity is the existence of identical allleles at a given locus._
+<br>
+<br>
+_**Question/Coding Challenge**_: Run the code below multiple times to repeat the simulation of drift, but now also plotting homozygosity. What do you notice about how homozygosity changes over time?
+<br>
 
 ```{r}
 sim_freqs(N = 1000, t_out = seq(0, 365 * 10, 7), plot_homo = TRUE)
 ```
+_**Answer**_: It always increases to 1
+<br>
+<br>
 
-What happens when you add in some mutation? Try mutation rates of 1e-3 and 1e-4. What happs to the equilibrium level of homozygosity?
+_**Question/Coding Challenge**_: Run the above code but now consider what happens when you add in some mutation? Try mutation rates of 1e-3 and 1e-4. What happens to the equilibrium level of homozygosity?
 
 ```{r}
 sim_freqs(N = 1000, t_out = seq(0, 365 * 10, 7), mut_rate = 1e-4, plot_homo = TRUE)
 ```
 
-We can add in a line showing the theoretical expectation.
 
 ```{r}
 sim_freqs(N = 1000, t_out = seq(0, 365 * 5, 7), mut_rate = 1e-4, plot_homo = TRUE, plot_expected_homo = TRUE)
 ```
+<br>
+_**Question**_: What similarities do you notice between allele frequencies and homozygosity patterns?
+<br>
+<br>
+<br>
 
 ## Multiple subpopulations {-}
-Now we will consider an example with multiple subpopulations (demes).
+In the prior section, you analyzed how allele frequencies changed under various scenarios in a single subpopulation. In this section, we will explore how these patterns change when multiple subpopulations (demes) are interacting (or not interacting). 
 
 ### Perfectly isolated subpopulations {-}
+First, we will explore a scenario where we have 10 independent demes. This could represent ten villages where there is no movement of people (or parasites) between those villages.
 
-Try running a simulation with 10 independent demes.This could represent ten villages where there is no movement of people between those villages. Notice that allele frequencies tend to diverge.
+_**Question/Coding Challenge**_: Run the simulation with 10 independent demes. What do you expect to happen to do the allele frequencies? Is the pattern for the indepedent demes similar or different than the pattern you observed when only considering a single subpopulation? 
+
 
 ```{r}
 sim1 <- sim_freqs(N = 1000, demes = 10, mig_rate = 0, mut_rate = 1e-4)
 ```
+<br>
+_**Answer**_: In the independent populations, you can appreciate that the allele frequencies tend to diverge. This is the same behavior as our single subpopulation simulations above, but now replicated in 10 independent "trials" (or populations). 
+<br>
+<br>
 
-#### Calculating $F_{ST}$ to measure population differentiation{-}
-
-Next we will explore a metric used to measure population differentiation.
-
-_**Definition:** Fixation index, or $F_{ST}$ and Jost's D are both measures of genetic differentiation between different subpopulations._
-
-When $F_{ST}$ is close to **1** it means that individuals in a population tend to carry a _small number of alleles_. Individuals are “differentiated” in the sense that alleles are not freely mixing between people.
-
-
+#### Calculating Population Differentiation{-}
+Next we will explore metrics used to measure population differentiation and contrast populations. We will focus on two different metrics of genetic differentiation among different subpopulations: the *fixation index*, or $F_{ST}$ and *Jost's D*.
+<br>
 High values of $F_{ST}$ and Jost's D both suggest a greater genetic differentiation between the subpopulations being measured. However both metrics have different approaches to measure genetic differentiation. 
 
+<br>
+<br>
 
-We can calculate a simple version of $F_{ST}$ manually
+##### Fst
+We will first analyze $F_{ST}$. Note, when $F_{ST}$ is close to **1** it means that individuals in a population tend to carry a _small number of alleles_, or a _smaller number of segregating sites_. This is to say, within the population, individuals have genomes that are identical at numerous loci. As a result, individuals are “differentiated” in the sense that alleles are distinct between the populations and are not freely mixing between individuals between populations (*i.e.* they are segregated). 
+<br>
+Below, we have provided a simple version of $F_{ST}$ that can be calculated manually: 
+$$
+F_{ST} = \frac{\sigma^2_{\mbox{subpop}}}{\sigma^2_{\mbox{total}}} = \frac{\sigma^2_{\mbox{subpop}}}{\bar p (1-\bar p)}
+$$
+This equation says that $F_{ST}$ is a measure of the variance of allele frequencies among the subpopulations divided by the total variation in the allele frequency in the population, based on the defintion of binomial variance (as we are dealing with biallelic loci).
 
 ```{r}
 sim_fst <- sim1$data %>%
@@ -225,8 +268,11 @@ sim_fst <- sim1$data %>%
             p_var = var(freq),
             Fst = p_var / (p_mean * (1 - p_mean)))
 ```
+<br>
+<br>
 
-Now lets plot $F_{ST}$ over time. What do you notice about differentiation?
+
+_**Question/Coding Challenge**_: Now use the `geom_line` layer from ggplot to plot $F_{ST}$ over time (x-axisL time, y-axis: Fst). What do you notice about differentiation?
 
 ```{r}
 ggplot(sim_fst) +
@@ -234,12 +280,12 @@ ggplot(sim_fst) +
   expand_limits(y = c(0, 1))
 ```
 
-What happens if you repeat the process above with a higher mutation rate?
+_**Question/Coding Challenge**_: Now repeat the process above (simulation and plotting) with a higher mutation rate (`mut_rate = 1e-3`)? What changes do you notice? 
 
 ```{r}
 sim1 <- sim_freqs(N = 100, demes = 10, mig_rate = 0, mut_rate = 1e-3,
                   t_out = seq(0, 365*10, 7), plot_on = FALSE)
-sim1$data %>%
+p1 <- sim1$data %>%
   select(-locus) %>%
   group_by(time) %>%
   summarise(p_mean = mean(freq),
@@ -250,23 +296,48 @@ sim1$data %>%
   expand_limits(y = c(0, 1))
 ```
 
-The equilibrium level of $F_{ST}$is known to be 1/(1 + 2*N*mu) in this case. How does this level compare with what you saw in the plot?
+The equilibrium level of $F_{ST}$, where the mutation rate is in stead state with the rate of drift, is known to be $\frac{1}{(1 + 2N\mu)}$ in this case, where $N$ is the population size, and $\mu$ is the mutation rate. 
 
-```{r}
-# e.g. use
-#geom_hline(yintercept = 1 / (1 + 2*1e2*1e-3), linetype = "dashed")
+_**Question/Coding Challenge**_: Add this level in the plot above `geom_hline(yintercept = 1 / (1 + 2*1e2*1e-3), linetype = "dashed")`. How does this line compare with what you see in the plot?
+
+```{r, eval = F}
+p1 <- sim1$data %>%
+  select(-locus) %>%
+  group_by(time) %>%
+  summarise(p_mean = mean(freq),
+            p_var = popvar(freq),
+            Fst = p_var / (p_mean * (1 - p_mean))) %>%
+  ggplot() + theme_bw() +
+  geom_line(aes(x = time, y = Fst)) +
+  expand_limits(y = c(0, 1)) + 
+  geom_hline(yintercept = 1 / (1 + 2*1e2*1e-3), linetype = "dashed")
 ```
 
 The fact that $F_{ST}$ depends on the mutation rate can lead to problems. If one marker has a high mutation rate (e.g. microsatellites) then we would expect to see low values of $F_{ST}$, even if the populations have been evolving separately for a long time, and in this sense are well differentiated.
 
-Jost's D is an alternative way of looking at differentiation.
+##### Jost's D
+Jost's D is an alternative way of looking at differentiation that is less sensitive to the mutation rate.  
 
-When Jost's D is close to **1** it means that alleles tend to be present in _a small number of individuals_. Individuals are “differentiated” in the sense that they contain different genetic material.
+_**Coding Challenge**_: Simulate a population with 100 individuals, 10 demes, no migration, and a mutation rate of 1e-3. Consider timepoints every week for 10 years. 
 
 ```{r}
 sim1 <- sim_freqs(N = 100, demes = 10, mig_rate = 0, mut_rate = 1e-3,
                   t_out = seq(0, 365*10, 7), plot_on = FALSE)
+```
 
+
+Now, we will calculate Jost's D, using the follow equation: 
+$$
+D = \frac{H_{Te}-H_{Se}}{1-H_{Se}} \frac{k}{k-1} 
+$$
+Jost's D is intuitively similar to Wright's $F_{ST}$, when $F_{ST}$ is considered under the alternative definition based on identity by state/descent (to be discussed later). As a result, the equation above states that the expected heterozygosity ($H_{.e}$) in the total population ($T$) can be contrasted with the expected heterozygosity in the subpopulation ($S$) to determine the overall population differentiation. Note, the $k$ terms help to transform the range of Jost's D to 0-1.
+
+<br>
+As a result, we expect that in populations that are distinct, Jost's D is close to **1**, as it means that alleles tend to be present in _a small number of individuals_ within the subpopulation (small $H_{Se}$). Individuals are “differentiated” in the sense that they contain different genetic material (large $H_{Te}$). 
+<br>
+Use the code chunk below to explore this statistics.  
+
+```{r}
 sim1$data %>%
   select(-locus) %>%
   group_by(time) %>%
@@ -278,20 +349,24 @@ sim1$data %>%
   expand_limits(y = c(0, 1.2))
 ```
 
-Jost's D does not suffer from the same problem as $F_{ST}$, but it suffers from a different problem - it assumes infinite alleles mutation. When we have a biallelic SNP, Jost's D will tend to reach values of around 0.5 at equilibrium. (This is actually a bit of a subtle point - maybe easier to understand if I generalise the above to allow more than two alleles?)
+Jost's D does not suffer from the same problem as $F_{ST}$, but it suffers from a different problem - it assumes infinite alleles mutation. When we have a biallelic SNPs, Jost's D will tend to reach values of around 0.5 at equilibrium.  
 
-In conclusion, both $F_{ST}$ and D have their limitations. $F_{ST}$ is good when mutation rates are low, for example biallelic SNPs. Jost's D is good for highly diverse and fast-mutating sites, such as microsats.
+In conclusion, both $F_{ST}$ and D have their limitations. $F_{ST}$ is good when mutation rates are low, for example biallelic SNPs. Jost's D is good for highly diverse and fast-mutating sites, such as microsatellites.
 
 
 ### Connected subpopulations {-}
+In this section, we will explore what happens when we connect our demes  by migration. In other words, we are relaxing our assumption of independent populations from above.  
 
-What happens when we connect our demes up by migration? Try experimenting with larger and smaller migration rates in the following. What do you notice about the allele frequencies? (lines tend to be less bumpy and move together when migration is high)
+_**Question/Coding Challenge**_: Run the simulator now with 1000 individuals, 5 demes, and a low migration rate. What do you observe in the allele frequencies? Try experimenting with larger and smaller migration rates in the following. What do you notice about the allele frequencies? 
 
 ```{r}
 sim_freqs(N = 1000, demes = 5, mig_rate = 0.01)
 ```
 
-Lets look at what happens to $F_{ST}$ when we include migration. What happens when you increase/decrease the migration rate?
+#### Fst with Migration {-}
+Lets look at what happens to $F_{ST}$ when we include migration. 
+<br>
+_**Question/Coding Challenge**_: What happens to the $F_{ST}$ values when you increase/decrease the migration rate? Does this make sense? 
 
 ```{r}
 sim1 <- sim_freqs(N = 1000, demes = 10, t_out = seq(0, 365*20, 7), mig_rate = 1e-3,
@@ -308,9 +383,12 @@ sim1$data %>%
   geom_hline(yintercept = 1 / (1 + 2*1e3*(1e-3 + 1e-6)), linetype = "dashed")
 ```
 
-Theory tells us that the equilibrium level of $F_{ST}$ in this situation is given by 1/(1 + 2*N*(m + mu)). Does this result hold up this your simulations? (yes, on average). Note that migration rates are usually much larger than mutation rates, meaning we can often simplify this to 1/(1 + 2*N*m).
+Theory tells us that the equilibrium level of $F_{ST}$ in this situation is given by $\frac{1}{1 + 2N(m + mu)}$. This is a similar idea to the equilibrium we discussed above, but we are now balancing the forces of drift, migration, and mutation to reach a new equilibrium. 
+<br>
+_**Question/Coding Challenge**_: Does this equilibrium appear in your simulations? Note that migration rates are usually much larger than mutation rates, meaning we can often simplify the above equilibrium to $\frac{1}{1 + 2Nm}$.
 
-Conclusion - at equilibrium, $F_{ST}$ reaches a level that is a balance between the strength of genetic drift (i.e. small population size) and migration. The higher the migration rate, the lower the value of $F_{ST}$. This means we can use $F_{ST}$ to tell us something about the connectivity of populations. Small pairwise $F_{ST}$ tends to indicate highly connected populations and vice versa.
+
+Conclusion for $F_{ST}$ and migration: at equilibrium, $F_{ST}$ reaches a level that is a balance between the strength of genetic drift (i.e. small population size) and migration. The higher the migration rate, the lower the value of $F_{ST}$. This means we can use $F_{ST}$ to tell us something about the connectivity of populations. Small pairwise $F_{ST}$ tends to indicate highly connected populations and vice versa.
 
 Note, however, that these patterns take a very long time to build up. So we are not talking about the timescale of control programmes, but more of an evolutionary timescale.
 
@@ -348,7 +426,7 @@ dat$samples$Cluster <- as.factor(match(latlon, unique(latlon)))
 saveRDS(dat, file = "data/DRC_MIPs_biallelic_processed.rds")
 ```
 
-Have a look at the data using the *MIPanalyzer* package.
+_**Coding Challenge**_: Have a look at the data using the *MIPanalyzer* package (*i.e.* just input the object to the console).
 
 ```{r}
 # load data
@@ -362,7 +440,7 @@ head(MIP_data$samples)
 head(MIP_data$loci)
 ```
 
-let's create a copy of the dataset that does not include any DRC samples:
+_**Coding Challenge**_: Now let's create a copy of the dataset that does not include any DRC samples using the ` MIPanalyzer::filter_samples` function:
 
 ```{r}
 # filter samples
@@ -374,9 +452,9 @@ MIP_data_noDRC
 
 ## PCA of DRC data {-}
 
-Principal Components Analysis or PCA can be used to reduce the number of dimensions or variables in a dataset, and can be used to more easily summarize data and in this case visualise genetic differentiation. 
+Principal Components Analysis or PCA can be used to reduce the number of dimensions or variables in a dataset. As such, it is often used to more easily summarize data and in this case visualise genetic differentiation. 
 
-Now lets do PCA on the within-sample allele frequencies.
+_**Coding Challenge**_: Now using `MIPanalyzer::get_wsaf` and the `MIPanalyzer::pca_wsaf` function, let's create a PCA from the within-sample allele frequencies for samples not from the DRC. Then plot the resulting principal components from using the `geom_point` layer from ggplot. 
 
 ```{r}
 wsaf_impute <- MIPanalyzer::get_wsaf(MIP_data_noDRC, impute = TRUE, FUN = mean)
@@ -390,9 +468,12 @@ ggplot(plot_df) + theme_bw() +
   geom_point(aes(x = PC1, y = PC2, color = Country))
 ```
 
-We see well-separated clusters, which makes sense geographically. Now let's repeat the process using all samples including those from DRC.
 
-```{r}
+We see well-separated clusters, which makes sense geographically. \
+
+_**Coding Challenge**_: Now let's repeat the process using all samples including those from DRC. Use the code above to make this new PCA using the `MIP_data` dataframe (this code chunk is being hidden on purpose to let you practice!). 
+
+```{r, echo=F}
 wsaf_impute <- MIPanalyzer::get_wsaf(MIP_data, impute = TRUE, FUN = mean)
 pca <- MIPanalyzer::pca_wsaf(wsaf_impute)
 
@@ -404,35 +485,37 @@ ggplot(plot_df) + theme_bw() +
   geom_point(aes(x = PC1, y = PC2, color = Country))
 ```
 
-The DRC points connect the other points. This suggests that there is more of a spatial continuum of allele frequencies.
+The DRC points connect the other points. This suggests that there is more of a spatial continuum of allele frequencies in the DRC and that it may act as a "bridge" between the East and West African countries.
 
-We can plot the contributions that each locus makes to this PCA. Starting with PC1, what do you notice about the balance of geographically informative vs. non-informative SNPs? (the pattern is mostly driven by geographically informative SNPs). What does this suggest? (the primary factor driving this PCA is spatial location)
+_**Question/Coding Challenge**_: Use the `MIPanalyzer::plot_pca_contribution` fucntion to plot the contributions that each locus makes to this PCA. Starting with PC1, what do you notice about the balance of geographically informative vs. non-informative SNPs?  What does this suggest?
 
 ```{r}
 # plot component 1
 MIPanalyzer::plot_pca_contribution(pca, component = 1, chrom = MIP_data$loci$CHROM, pos = MIP_data$loci$POS,
                                    locus_type = MIP_data$loci$GEO)
 ```
+**_Answer_**: The pattern is mostly driven by geographically informative SNPs, which suggests that the primary factor driving this PCA is spatial location.
 
-Now repeat the process with PC2. What do you notice about where these loci are on the genome? (they are all in one or two places). What genes are at these positions? (pfcrt on chrom7. Small peak at dhps on chromosome 8)
+_**Question/Coding Challenge**_: As above, use the `MIPanalyzer::plot_pca_contribution` to repeat this process with PC2 (this code chunk is hidden on purpose to allow you to practice!). What do you notice about where these loci are on the genome? What genes are at these positions? You can use [PlasmoDB](https://plasmodb.org/plasmo/app/) to try and investigate these genomic locations. 
 
-```{r}
+```{r, echo=F}
 # plot component 2
 MIPanalyzer::plot_pca_contribution(pca, component = 2, chrom = MIP_data$loci$CHROM, pos = MIP_data$loci$POS,
                                    locus_type = MIP_data$loci$GEO)
 ```
-
+_**Answer**_: There all peaks at loci in one or two places. These are the pfcrt on chrom7 and then smaller peak at dhps on chromosome 8.
 
 -------------------------
 
 # Inferring population structure using *rmaverick* {-}
 
-*rmaverick* is an R package which we will use to further investigate population structure.  
-
-First we will load genetic barcode data from [Bei et al., 2018](https://pubmed.ncbi.nlm.nih.gov/29325146/ ) . This study contains samples taken at two separate time points over ten years apart in two locations in Senegal.  These data have already been filtered to remove the two Thies samples, and to order in terms of date (2001-2002 vs. 2014) and location (Dielmo and Ndiop). 
+*rmaverick* is an R package which we will use to further investigate population structure. Please read the [package documentation](https://github.com/bobverity/rmaverick) to understand the various input parameters and model options.
+<br>
+<br>
+First we will load genetic barcode data from [Bei et al., 2018](https://pubmed.ncbi.nlm.nih.gov/29325146/). This study contains samples taken at two separate time points over ten years apart in two locations in Senegal.  These data have already been filtered to remove the two Thies samples, and to order in terms of date (2001-2002 vs. 2014) and location (Dielmo and Ndiop). 
 
 ```{r, echo=FALSE, eval=FALSE}
-# code not run - this is how I get the raw data from SIMPLEGEN and process it
+# code not run - this is how I get the raw data from SIMPLEGEN and processed it
 load("/Users/rverity/Dropbox/Bob/Work/My Programs/Simulation/SIMPLEGEN/data/Bei_2018.RData")
 Bei_2018_processed <- Bei_2018
 
@@ -451,7 +534,7 @@ Bei_2018_processed$SNP_locations <- as.data.frame(Bei_2018_processed$SNP_locatio
 save(Bei_2018_processed, file = "data/Bei_2018_processed.RData")
 ```
 
- Now let's look at a snapshot of the data, which includes measures of transmission intensity in the two timepoints and regions. We will look at:
+Now let's look at a snapshot of the data, which includes measures of transmission intensity in the two timepoints and regions. We will look at:
  - Entomological Innoculation Rate (EIR)
  - The barcodes
  - The SNP locations
@@ -466,7 +549,7 @@ head(Bei_2018_processed$barcodes)
 head(Bei_2018_processed$SNP_locations)
 ```
 
-Some data processing
+Below, we are performing some data munging for `rmaverick`. Please copy and paste the code below into your console. 
 
 ```{r}
 # filter out polygenomics
@@ -493,19 +576,15 @@ myproj
 
 Markov Chain Monte Carlo (MCMC) approaches allow us to fit models by sampling from complex probability distributions. Here we will use MCMC to fit our model in rmaverick. 
 
-Let's run an MCMC in rmaverick. Users should run this with pb_markdown = FALSE.
+Let's run an MCMC in rmaverick. Users should run this with pb_markdown = TRUE.
 
 ```{r}
-myproj <- rmaverick::run_mcmc(myproj, K = 1:8, burnin = 1e3, samples = 1e3,
-                              rungs = 10, GTI_pow = 1.5, pb_markdown =  TRUE)
+myproj <- quiet(rmaverick::run_mcmc(myproj, K = 1:8, burnin = 1e3, samples = 1e3,
+                              rungs = 10, GTI_pow = 1.5, pb_markdown =  FALSE))
 
 ```
 
 First we will carry out some MCMC diagnostic checks. Check that coupling acceptance rates are above 0. Do this for every value of K (the number of subpopulations) from 2 to the max value explored.
-
-
-
-[Question for Bob - is rmaverick MCMCMC? Not sure how far to get into the diagnostics but I think more explanation required.]
 
 _**Definition:** Coupling acceptance rates are the rates of proposals in the MCMC which are accepted._
 
@@ -516,20 +595,20 @@ _**Definition:** The K value is the number of subpopulations in rmaverick._
 rmaverick:::plot_mc_acceptance(myproj, K = 8)
 ```
 
-
-Now check what the program thinks about the best value of K. In this case, values around 3-5 are reasonably likely
+_**Question/Coding Challenge**_: Using the `rmaverick::plot_logevidence_K` and `rmaverick::plot_posterior_K` functions, check what K values were found to have the most support. In this case, values around 3-5 are reasonably likely.
 
 ```{r}
 rmaverick::plot_logevidence_K(myproj)
 rmaverick::plot_posterior_K(myproj)
 ```
 
-Finally,  we will produce a STRUCTURE plot. This plot shows differences in the distribution of genetic variants amongst populations  We will add vertical lines to break up into the following groups:
+Finally,  we will produce a "STRUCTURE" plot. This plot shows differences in the distribution of genetic variants amongst populations  We will add vertical lines to break up the genetic data into the following groups:
 1. Dielmo 2001-2001
 2. Ndiop  2001-2002
 1. Dielmo 2014
 2. Ndiop  2014
 
+_**Question/Coding Challenge**_: Using the `rmaverick::plot_qmatrix` fucntion to make the "STRUCTURE" plot and add x-intercepts at ` c(4, 10, 16) + 0.5` to break up the groups per above.
 ```{r}
 rmaverick::plot_qmatrix(myproj, K = 3:5) +
   geom_vline(xintercept = c(4, 10, 16) + 0.5, size = 1)
@@ -538,14 +617,14 @@ rmaverick::plot_qmatrix(myproj, K = 3:5) +
 
 
 Notice that the later samples are (mostly) clearly allocated to one or other population with high probability. These essentially represent clonal lineages. We can see that groups 2,3,4 are present in Dielmo in 2014, and in Ndiop we additionally have group 1.
-
-Comparing this to the earlier time point, samples are far more ambigious in their allocation. They look a bit like some of these clonal lineages, but it's not clear cut, probably because there is some additional variation. Interestingly, group 4 dominates in Ndiop in 2001-2002. This lineage is almost completely lost by the later sampling point.
-
+<br>
+Comparing this to the earlier time point, samples are far more ambiguous in their allocation. They look a bit like some of these clonal lineages, but it's not clear cut, probably because there is some additional variation. Interestingly, group 4 dominates in Ndiop in 2001-2002. This lineage is almost completely lost by the later sampling point.
+<br>
 Overall, we can see evidence of increasing population structure over time. Compare this with the EIR values - what do you notice? (lower transmission later in time, therefore increasing differentiation and population structure).
 
 -------------------------
-
-ConcludiCCCquncluding questions to summarize:
-1. What can allele frequencies tell us about population differentiation?
-2. What does $F_{ST}$ tell us and what are its limitations?
-3. When is population structure more ambiguous when using allele frequencies?
+## Summary {-}
+Concluding questions to discuss/summarize:  
+1. What can allele frequencies tell us about population differentiation?  
+2. What does $F_{ST}$ tell us and what are its limitations?  
+3. When is population structure more ambiguous when using allele frequencies?  
