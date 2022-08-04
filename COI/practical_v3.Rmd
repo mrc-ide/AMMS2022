@@ -561,8 +561,12 @@ Finally, visualise your Fws values:
 
 
 ```{r}
-
-hist(combined_long_fws$fws)
+combined_long_fws %>% 
+ggplot() +
+  geom_histogram(aes(x=fws, y = (..count../sum(..count..))*100),
+                 color = "#000000", fill = "#d9d9d9") +
+  xlab("Fws") + ylab("Frequency (%)") +
+  theme_linedraw()
 
 ```
 
@@ -591,22 +595,33 @@ Finally, let's produce plots comparing these different parameters
 ```{r}
 
 # Plot
-boxplot(fws ~ mean,
-        xlab="COI",
-        ylab="Fws",
-        col="purple",
-        data=combined_long_fws_COI)
+combined_long_fws_COI %>% 
+  dplyr::mutate(meanfact = factor(mean, levels = 1:4)) %>% 
+  ggplot() + 
+  geom_boxplot(aes(x = meanfact, y = fws, 
+                   group = meanfact, color = country)) + 
+  facet_wrap(~country) + 
+  labs(x = "COI", y = "Fws") +
+  theme_linedraw() +
+  theme(legend.position = "none") 
+
 ```
+
 
 #### COI vs. Number of heterozygous sites
 ```{r}
 
 # Plot
-boxplot(n_hets ~ mean,
-        xlab="COI",
-        ylab="Number of Heterozygous Sites",
-        col="purple",
-        data=combined_long_fws_COI)
+combined_long_fws_COI %>% 
+  dplyr::mutate(meanfact = factor(mean, levels = 1:4)) %>% 
+  ggplot() + 
+  geom_boxplot(aes(x = meanfact, y = n_hets, 
+                   group = meanfact, color = country)) + 
+  facet_wrap(~country) + 
+  labs(x = "COI", y = "Number of Heterozygous Sites") +
+  theme_linedraw() +
+  theme(legend.position = "none") 
+
 
 ```
 
