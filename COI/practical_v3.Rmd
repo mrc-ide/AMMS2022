@@ -469,6 +469,18 @@ combined_COI %>%
 
 `r end_button()`
 
+**Q10:** Using `tidyverse` commands, compute the fraction of mixed infectios for each country.
+
+`r begin_button(10)`
+
+**A10:**
+
+```{r}
+combined_COI %>% group_by(country) %>% summarise(frac_mixed=sum(mean>1)/n())
+```
+
+`r end_button()`
+
 # Compute Fws
 Our next task will be to compute Fws. From the lecture we learned that the Fws statistic describes how much diversity is lost in an individual sample, relative to its population of origin. For each SNP, it is computed with the following formula:
 
@@ -559,18 +571,17 @@ combined_long_fws <- dplyr::full_join(combined_long, plaf, by = c("CHROM", "POS"
 
 Finally, visualise your Fws values:
 
-
 ```{r}
 
 hist(combined_long_fws$fws)
 
 ```
 
-**Q10:** Do the Fws conform to expectation? Explain.
+**Q11:** Do the Fws conform to expectation? Explain.
 
-`r begin_button(10)`
+`r begin_button(11)`
 
-**A10:** Here, we see that DRC has *lower* Fws than VN. Again, this would be expected if transmission intensity were higher in the DRC._
+**A11:** _Here, we see that DRC has *lower* Fws than VN. Again, this would be expected if transmission intensity were higher in the DRC._
 
 `r end_button()`
 
@@ -585,7 +596,7 @@ combined_long_fws_COI <- dplyr::left_join(combined_long_fws,
                          by="Indiv")
 ```
 
-Finally, let's produce plots comparing these different parameters
+Finally, let's produce plots comparing these different parameters.
 
 #### COI vs. Fws
 ```{r}
