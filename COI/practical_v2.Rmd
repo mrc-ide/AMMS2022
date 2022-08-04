@@ -114,7 +114,7 @@ Vietnam <- quiet(vcfR::read.vcfR("data/SNPs.Vietnam.setD.random96.vcf"))
 ## Initial QC
 As is always good practice, we can check our VCF for missing data and confirm it has the number of SNPs and samples that we expect. Explore the details and inner-workings of our new VCF to get a sense if it is trustworthy (_i.e._ does the data look reasonable? Is there anything strange in the INFO column?). 
 
-#### DRC QC
+#### DRC QC {.unnumbered}
 **Q1.** Use the `extract.gt` function from the vcfR package to pull out the allele depth (first record) for the DRC VCF. Now plot that allele depth as an initial data exploration using the `heatmap.bp` function from the `vcfR` package.
 
 `r begin_button(1)`
@@ -126,7 +126,7 @@ vcfR::heatmap.bp(ad, cbartplot = F, rbarplot = F, clabels = F, rlabels = F)
 `r hrule()`
 <br>
 
-#### VN QC
+#### VN QC {.unnumbered}
 **Q2.** As above, but now for the Vietnam VCF. 
 
 `r begin_button(2)`
@@ -145,6 +145,57 @@ $$WSRAF_A= \frac{\mbox{Reads supporting referent allele}_A}{\mbox{Total reads se
 <br>
 It may be beneficial for participants to review the [VCF format specifications](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and/or the R community's approach to [tidy data](https://r4ds.had.co.nz/tidy-data.html) in order better approach the problem above. 
 <br>
+
+**Q3.** Tidy the genomic data by finishing the relevant parts of code chunk below (participants should replace "***" with their own code).
+```
+loci <- DRCongo@fix[,1:2] %>% 
+  tibble::as_tibble() %>% 
+  dplyr::mutate(POS = as.numeric(POS),
+                Key = 1:dplyr::n()) %>% 
+  dplyr::select(c("CHROM", "POS", "Key"))
+
+# tidy up the DRC data to long format
+DRC_long <- DRCongo %>% 
+  vcfR::extract_gt_tidy() %>% 
+  dplyr::mutate(country = "DRC")
+
+# tidy up the VN data to long format
+VN_long <- Vietnam %>% 
+  ***
+  dplyr::mutate(country = "VN")
+
+# combine the DRC and VN data into one long dataframe
+combined_long <- dplyr::bind_rows(DRC_long, VN_long) 
+
+# now lets merge the loci information with the individual level information
+combined_long <- dplyr::full_join(***, by  = "Key") %>% 
+  # don't need Key anymore
+  dplyr::select(-c("Key"))
+
+
+# extract GT information and get WSRAF for every sample at each loci
+combined_long <- combined_long %>% 
+  # lets make some new variables
+  dplyr::mutate(
+    # need to change the GT character to a numeric for maths
+    gt = dplyr::case_when(gt_GT == "0/0" ~ 0,
+                          gt_GT == ***, # Het calls should be replaced with 0.5 
+                          gt_GT == "1/1" ~ 1), 
+    # get reference allele depth
+    rad = purrr::map_dbl(gt_AD, function(x){vcfR::masplit(
+      as.matrix(x), record = 1, sort = FALSE, decreasing = FALSE)}),
+    # get alternate allele depth 
+    aad = purrr::map_dbl(gt_AD, function(x){vcfR::masplit(
+      as.matrix(x), record = 2, sort = FALSE, decreasing = FALSE)}),
+    # calculate within-sample reference allele freq
+    wsraf = ***, # referent allele depth (rad) should be in numerator
+    wsraf = ifelse(is.nan(wsraf), NA, wsraf) # occurs when 0/0
+  ) %>% 
+  # now let's select the variables that we want
+  dplyr::select(c("CHROM", "POS", "Indiv", "gt", "country", "wsraf")) 
+```
+
+`r begin_button(3)`
 ```{r}
 # extract information
 # loci <- vcfR::extract_info_tidy(DRCongo)
@@ -194,9 +245,13 @@ combined_long <- combined_long %>%
   # now let's select the variables that we want
   dplyr::select(c("CHROM", "POS", "Indiv", "gt", "country", "wsraf")) 
 ```
+`r end_button()`
+`r hrule()`
+<br>
+
 
 ### Look at VCF  data in "long" format 
-As requested above, you should now have a _dataframe_ with columns for the individual sample, the chromosome and position information for each loci, the genotype call at the given loci for that sample, the county the sample belongs to, and the within-sample referent allele frequency for the given loci for that sample. 
+As requested above, you should now have a _dataframe_ with columns for the individual sample, the chromosome and position information for each loci, the genotype call at the given loci for that sample, the county the sample belongs to, and the within-sample referent allele frequency for the given loci for that sample. Let's look at our dataframe. 
 ```{r, eval=F}
 head(combined_long)
 ```
@@ -213,13 +268,19 @@ COIn_toss(COI = 6, loci = 3)
 ```
 
 
-**Question:** As COI increase, what is the expected relationship of proportion of loci that are heterozygous?
-
-**Answer:** _As COI increases, more loci will have heterozygous genotype calls._  
-
-**Question:** What advantage is there for sequencing multiple loci if you suspect there is a high COI?
-
-**Answer:** _More loci will decrease the probability that our data contains false-negative genotype calls, where for example if we had three clones with coin toss results of: HHH. As a result, more loci have more opportunities to find heterozygous genotype calls._  
+**Conceptual Q1:** As COI increase, what is the expected relationship of proportion of loci that are heterozygous?
+`r begin_button(101)`
+**Answer:** As COI increases, more loci will have heterozygous genotype calls.
+`r end_button()`
+`r hrule()`
+<br>
+  
+**Conceptual Q2:** What advantage is there for sequencing multiple loci if you suspect there is a high COI?
+`r begin_button(102)`
+**Answer:** More loci will decrease the probability that our data contains false-negative genotype calls, where for example if we had three clones with coin toss results of: HHH. As a result, more loci have more opportunities to find heterozygous genotype calls.  
+`r end_button()`
+`r hrule()`
+<br>
 
 
 Now explore this pattern with more loci. Does this align with your inutition and answer above? 
@@ -233,14 +294,28 @@ COIn_toss(COI = 6, loci = 10)
 
 ```
 
-**Question:** Using the "Coin Toss" conceptual framework, desscribe how within sample allele frequencies may change as COI increases (where H = 0, T = 1)?
+**Conceptual Q3:** Using the "Coin Toss" conceptual framework, describe how within sample allele frequencies may change as COI increases (where H = 0, T = 1)?
 
-**Answer:** _As COI increases, expect WSAF to have more mass in intermediate alele frequency ranges and less mass at  0% and 100% allele frequency._  
-
+`r begin_button(103)`
+**Answer:** As COI increases, expect WSAF to have more mass in intermediate alele frequency ranges and less mass at  0% and 100% allele frequency.
+`r end_button()`
+`r hrule()`
+<br>
+  
 
 # Population Level Allele Frequencies
-In this section, we will look at the population level allele frequencies (PLAF) between the DRC and VN. Population level allele frequencies are calculated from the genotype calls across individuals per loci. Here, we will assume a diploid organism (faulty assumption but for convenience), and calculate homozygous referent calls, heterozygous, and homozygous altenrative calls as contributing 0, 1, 2 alleles to our overall PLAF calculation. Calculate the mean PLAF for the DRC and VN and compare them. Note, we will be exploring allele frequencies in greater depth during a later practical. 
+In this section, we will look at the population level allele frequencies (PLAF) between the DRC and VN. Population level allele frequencies are calculated from the genotype calls across individuals per loci. Here, we will assume a diploid organism (faulty assumption but for convenience), and calculate homozygous referent calls, heterozygous, and homozygous altenrative calls as contributing 0, 1, 2 alleles to our overall PLAF calculation. Note, we will be exploring allele frequencies in greater depth during a later practical. 
 
+**Q4.** Finish the code chunk below to calculate the PLAF.
+```
+plaf <- combined_long %>% 
+  dplyr::group_by(CHROM, POS, country) %>% 
+  dplyr::summarise(
+    # multiple by 2 to assume diploid genome
+    PLAF = ***
+  )
+```
+`r begin_button(4)`
 ```{r}
 plaf <- combined_long %>% 
   dplyr::group_by(CHROM, POS, country) %>% 
@@ -250,6 +325,9 @@ plaf <- combined_long %>%
   )
 
 ```
+`r end_button()`
+`r hrule()`
+<br>
 
 ### Visualizing PLAF
 Create a boxplot of your newly generated PLAF for the DRC and VN. 
