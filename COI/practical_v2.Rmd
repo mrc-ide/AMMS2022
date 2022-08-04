@@ -28,38 +28,11 @@ knitr::opts_chunk$set(echo = T, warning = F, message = F,
                       fig.align = 'center', fig.keep = 'all')
 ```
 
-<!-- Here we style out button a little bit -->
-
-```{=html}
-<style>
-.showopt {
-background-color: #004c93;
-color: #FFFFFF; 
-width: 100px;
-height: 20px;
-text-align: center;
-vertical-align: middle !important;
-border-radius: 8px;
-float:right;
-}
-
-.showopt:hover {
-background-color: #dfe4f2;
-color: #004c93;
-}
-
-</style>
-```
-<!--Include script for hiding output chunks-->
-
-```{=html}
-<script src="misc/hideOutput.js"></script>
-```
 # Dependencies for Practical {.unnumbered}
 
 Please copy and paste the below code chunk in it's entirety to your console to download R package libraries needed for this practical. If you are having trouble installing any of the R packages, please ask an instructor for a pre-loaded flash drive.
 
-```{r, echo=T}
+```{r, class.source = "fold-show"}
 deps <- c("tidyverse", "vcfR", "McCOILR")
 deps <- !sapply(deps, function(x){x %in% installed.packages()[,1]} )
 if(any(deps)) {
@@ -79,7 +52,7 @@ if(any(deps)) {
 
 Please now load all of those libraries into this session using the code chunk below. Please copy and paste it in its entirety.
 
-```{r, echo=T}
+```{r, class.source = "fold-show"}
 set.seed(48)
 source("R/utils.R")
 library(tidyverse)
@@ -91,32 +64,34 @@ Please set *your* working director so that you are in the `AMMS/COI` directory. 
 
 # Introduction {.unnumbered}
 ## Useful Definitions {.unnumbered}
-_**Definition:** An allele is the identity of a particular genetic locus or sequence that is inherited between parents and offspring._
-_**Definition:** An allele is considered to be biallelic if it only has two states in a population (i.e. a biallelic SNP can either be A or T in the population)._
-_**Definition:** A locus is a fixed position on a chromosome where a particular genetic marker is located._
-_**Definition:** Sequencing data consists of sequences of DNA obtained from a DNA sequencing reaction_
+_**Definition:** An allele is the identity of a particular genetic locus or sequence that is inherited between parents and offspring._ <br>
+_**Definition:** An allele is considered to be biallelic if it only has two states in a population (i.e. a biallelic SNP can either be A or T in the population)._ <br>
+_**Definition:** A locus is a fixed position on a chromosome where a particular genetic marker is located._ <br>
+_**Definition:** Sequencing data consists of sequences of DNA obtained from a DNA sequencing reaction_ <br>
 _**Definition:** Complexity of infection, or multiplicity of infection, is a measure of the number of different malaria parasite clones in an individual sample._
-_**Definition:** A monoclonal malaria infection contains one parasite strain, or "genome" (complexity of infection [COI] = 1), while a polyclonal infection contains more than one parasite strain (COI > 1)._
-_**Definition**: Population Level Heterozygosity or Expected Heterozygosity ($H_E$): is a measure of the genetic diversity of the different clones in a population, at a particular genetic locus._
+_**Definition:** A monoclonal malaria infection contains one parasite strain, or "genome" (complexity of infection [COI] = 1), while a polyclonal infection contains more than one parasite strain (COI > 1)._ <br>
+_**Definition**: Population Level Heterozygosity or Expected Heterozygosity ($H_E$): is a measure of the genetic diversity of the different clones in a population, at a particular genetic locus._ <br>
+<br>
+<br>
 
 ## COI Review {.unnumbered}
 Complexity of infection (also know as multiplicity of infection) is the number of distinct clones, or parasite strains, that are within an individual. If there is only a single clone, the host is assumed to have a monoclonal infection. If there are more than one clones, or parasite strains, the host is assumed to have a polyclonal infection. Polyclonal infections result through two pathways: (1) superinfection and (2) contransmission. _Superinfection_ occurs when an individual is bit by multiple mosquitoes, each carrying distinct clones. _Cotransmission_ occurs when a single mosquito is carrying more than one clone and bites, and transmits, multiple clones to the individual concurrently.    
 <br>
 There are serveral motheds for calculating COI, that are all built on the premise that distinct alleles indciate different clones: 
 
-1. COI $=$ maximum number of alleles present at any genotyped locus in a sample. 
+1. COI = maximum number of alleles present at any genotyped locus in a sample. 
 
-2. COI $=$ the second highest number of alleles present at any genotyped locus in a sample. This is done to address the possibility of false positives in detecting alleles (sequencing error being interpreted as a "new" or "distinct" clone).  
+2. COI = the second highest number of alleles present at any genotyped locus in a sample. This is done to address the possibility of false positives in detecting alleles (sequencing error being interpreted as a "new" or "distinct" clone).  
 
 3. COI can also be statisitically estimated using tools which account for parasites sharing the same allele or that an allele present may not be detected (a false negative), resulting in underestimates, and that a false positive allele may be detected, resulting in over estimates. Software exists for calculating this from binary, or biallelic, SNP data (THE REAL McCOIL, Chang et al, 2017) 
 
 
 # Practical Goals {.unnumbered}
 
-By the end of this practical, you should understand the following concepts:  
-+ Malaria infections can either be monoclonal (single strain within host) or polyclonal (multiple strains within host)
-+ Complexity of infection (COI) is a measure of the number of strains: in a monoclonal infection COI = 1; in a polyclonal infection COI > 1
-+ In theory, COI is closely associated with transmission intenisty; in reality, COI is a crude measure of transmission intensity 
+By the end of this practical, you should understand the following concepts:      
+- Malaria infections can either be monoclonal (single strain within host) or polyclonal (multiple strains within host)    
+- Complexity of infection (COI) is a measure of the number of strains: in a monoclonal infection COI = 1; in a polyclonal infection COI > 1     
+- In theory, COI is closely associated with transmission intenisty; in reality, COI is a crude measure of transmission intensity     
 
 # Data Overview {.unnumbered}
 
@@ -131,27 +106,41 @@ For this practical, we will use 96 SNPs from 113 individuals from Democratic Rep
 Here, we will use the `vcfR` [package](https://knausb.github.io/vcfR_documentation/) to read in our variant call file (VCF) for the DRC and VN, respectively. 
 
 ```{r}
-DRCongo <- vcfR::read.vcfR("data/SNPs.DRCongo.setB.random96.vcf")
-Vietnam <- vcfR::read.vcfR("data/SNPs.Vietnam.setD.random96.vcf")
-#TODO fix vietnam path 
+# participants don't need the quiet bit
+DRCongo <- quiet(vcfR::read.vcfR("data/SNPs.DRCongo.setA.random96.vcf"))
+Vietnam <- quiet(vcfR::read.vcfR("data/SNPs.Vietnam.setD.random96.vcf"))
 ```
 
 ## Initial QC
-As is always good practice, we can check our VCF for missing data and confirm it has the number of SNPs and samples that we expect. Explore the details and inner-workings of our new VCF to get a sense if it is trustworthy (_i.e._ does the data look reasonable? Is there anything strange in the INFO column?). In addition, use the `extract.gt` function from the vcfR package to pull out the allele depth (first record) for your new VCF. Now plot that allele depth as an initial data exploration using the `heatmap.bp` function from the `vcfR` package.
+As is always good practice, we can check our VCF for missing data and confirm it has the number of SNPs and samples that we expect. Explore the details and inner-workings of our new VCF to get a sense if it is trustworthy (_i.e._ does the data look reasonable? Is there anything strange in the INFO column?). 
 
 #### DRC QC
+**Q1.** Use the `extract.gt` function from the vcfR package to pull out the allele depth (first record) for the DRC VCF. Now plot that allele depth as an initial data exploration using the `heatmap.bp` function from the `vcfR` package.
+
+`r begin_button(1)`
 ```{r}
 ad <- vcfR::extract.gt(DRCongo, element = "AD", as.numeric = T)
-vcfR::heatmap.bp(ad) 
+vcfR::heatmap.bp(ad, cbartplot = F, rbarplot = F, clabels = F, rlabels = F) 
 ```
+`r end_button()`
+`r hrule()`
+<br>
+
 #### VN QC
+**Q2.** As above, but now for the Vietnam VCF. 
+
+`r begin_button(2)`
 ```{r}
 ad <- vcfR::extract.gt(Vietnam, element = "AD", as.numeric = T)
-vcfR::heatmap.bp(ad) 
+vcfR::heatmap.bp(ad, cbartplot = F, rbarplot = F, clabels = F, rlabels = F) 
 ```
+`r end_button()`
+`r hrule()`
+<br>
 
 ## Munging & Extracting Genomic Data 
 In this section, we will "munge" our VCF data into a "tidy" format following recommendations by the R community. Use the `vcfR` package to make the VCF data "long" from "wide" and then combine the two datasets, making sure to have a new column that indicates if a sample came from the DRC or VN. In order to do this, you may want to explore the `extract_gt_tidy` function. Finally, use the per sample, per loci referent allele depth and loci depth to calculate the within sample referent allele frequency (WSRAF) for every sample in your new combined dataframe. Remember, in biallelic SNP data for sample A, we can calculate the referent allele frequency as: 
+
 $$WSRAF_A= \frac{\mbox{Reads supporting referent allele}_A}{\mbox{Total reads sequenced at loci}_A}$$
 <br>
 It may be beneficial for participants to review the [VCF format specifications](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and/or the R community's approach to [tidy data](https://r4ds.had.co.nz/tidy-data.html) in order better approach the problem above. 
@@ -583,10 +572,14 @@ if (!dir.exists(output_dir)) {
 }
 # DRC
 DRC_out_cat <- McCOIL_categorical(DRC_RMCLmat,
-                                  maxCOI=25, threshold_ind=20,
+                                  maxCOI=25, 
+                                  threshold_ind=20,
                                   threshold_site=20,
-                                  totalrun=1000, burnin=100, M0=15,
-                                  e1=0.05, e2=0.05,
+                                  totalrun=1000, 
+                                  burnin=100, 
+                                  M0=15,
+                                  e1=0.05, 
+                                  e2=0.05,
                                   err_method=3, 
                                   path="results",
                                   output="output_DRC_COI")

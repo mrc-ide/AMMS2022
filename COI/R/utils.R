@@ -1,3 +1,28 @@
+#  ---------------------------------------
+# draw horizontal line using html
+hrule <- function() {
+  '<hr style="height:1px;border:none;color:#333;background-color:#333;">'
+}
+
+#  ---------------------------------------
+# functions for beginning and ending an expandable answer
+begin_button <- function(ID) {
+  sprintf('<p><a class="btn-sm btn-primary" data-toggle="collapse" href="#collapseExample%s" role="button" aria-expanded="false" aria-controls="collapseExample%s">Click For Answer</a></p><div class="collapse" id="collapseExample%s"><div class="card card-body">', ID, ID, ID)
+}
+end_button <- function(ID) {
+  '</div></div><br>'
+}
+
+#  ---------------------------------------
+#' @title shhh
+#' @description sinks annoying calls to console
+quiet <- function(x) {
+  sink(tempfile())
+  on.exit(sink())
+  invisible(force(x))
+}
+
+#  ---------------------------------------
 #' @title COI Coin Toss Conceptual Visualization
 #' @details for a given set of loci, plot results of binomial toss
 
