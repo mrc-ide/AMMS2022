@@ -1,0 +1,1012 @@
+---
+title: "Calculating IBS & IBD"
+author: "Nick Brazeau, Sophie Berube, Izzy Routledge, & Abebe Fola"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    theme: readable
+    highlight: tango
+    code_folding: show
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+    toc_depth: 2
+    number_sections: yes
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F,
+                      fig.align = 'center', fig.keep = 'all')
+```
+
+# Dépendances pour Pratique {.unnumbered}
+
+Veuillez copier et coller le morceau de code ci-dessous dans son intégralité sur votre console pour télécharger les bibliothèques de packages R nécessaires à cette pratique. Si vous rencontrez des difficultés pour installer l'un des packages R, veuillez demander à un instructeur un lecteur flash préchargé.
+
+```{r, class.source = "fold-show"}
+deps <- c("tidyverse", "vcfR", "MIPanalyzer", "hmmibdr", "sf", "tidygraph", "ggraph")
+deps <- !sapply(deps, function(x){x %in% installed.packages()[,1]} )
+if(any(deps)) {
+  if(deps["hmmibdr"]) {
+    if (!"remotes" %in% installed.packages()[,1]){
+      install.packages("remotes")
+    }
+    remotes::install_github("OJWatson/hmmibdr")
+    deps <- deps[names(deps) != "hmmibdr"]
+  } else if(deps["MIPanalyzer"]) {
+    if (!"remotes" %in% installed.packages()[,1]){
+      install.packages("remotes")
+    }
+    remotes::install_github("mrc-ide/MIPanalyzer")
+    deps <- deps[names(deps) != "MIPanalyzer"]
+  } else {
+    install.packages(names(deps)[deps])
+  }
+}
+
+```
+
+Veuillez maintenant charger toutes ces bibliothèques dans cette session en utilisant le morceau de code ci-dessous. Veuillez le copier-coller dans son intégralité.
+
+```{r, class.source = "fold-show"}
+library(tidyverse)
+library(vcfR)
+library(hmmibdr)
+library(sf)
+library(tidygraph)
+library(ggraph)
+library(cowplot)
+```
+
+Enfin, veuillez sourcer (*c'est-à-dire* charger) le fichier appelé `utils.r` qui est stocké sous le répertoire `IBD/R`. Si vous utilisez l'environnement `IBD.Rproj`, vous pouvez simplement exécuter `source("R/utils.R")` comme ci-dessous. Ou si vous exécutez à partir d'un environnement ou d'un répertoire de travail différent (`getwd()`), utilisez la fonction `file.choose` pour vous aider à localiser le fichier.
+
+```{r, class.source = "fold-show"}
+source("R/utils.R")
+```
+
+# Introduction {.unnumbered}
+<br>
+## Aperçu de la relation {.unnumbered}
+
+Au cours des sessions précédentes, vous avez exploré comment estimer les relations en fonction des niveaux de diversité, de structure et de connectivité de la population. Dans cette pratique, nous nous concentrerons sur les mesures inter-parasites, ou par paires, de la parenté génétique. Il s'agit de mesures de parenté plus axées sur "l'individu" par rapport à la population, ou dème, des mesures de parenté axées sur la population.
+<br>
+Il existe deux façons principales d'estimer la parenté entre les individus: l'identité par descendance (IBD) ou le temps jusqu'à l'ancêtre commun le plus récent (TMRCA) (voir [Speed & Balding 2015](https://pubmed.ncbi.nlm.nih.gov/ 25404112/) pour une discussion plus approfondie). Nous nous concentrerons sur l'IBD, qui tire parti de la recombinaison pour détecter l'héritage commun récent de matériel génétique ou la parenté génétique.
+<br>
+<br>
+<br>
+
+## Présentation IBS/IBD {.unnumbered}
+
+Comme décrit dans la conférence, nous pouvons considérer la parenté par paires en déterminant si la séquence génétique à une position donnée dans le génome, un loci, entre deux parasites est identique (par exemple, le même allèle). Nous pouvons soit simplement mesurer le nombre de sites avec des allèles identiques entre deux individus, appelés identité par état (IBS), soit nous pouvons utiliser des modèles statistiques pour déterminer si des allèles identiques et des "blocs" du génome étaient susceptibles d'être hérités d'un ancêtre commun, appelé identité par descendance (IBD). Il est important de noter les différences entre IBS et IBD: IBS fait référence à "l'état" ou à la réalisation de l'allèle à un loci et peut être le résultat de nombreux facteurs autres que l'ascendance (par exemple, la sélection, la dérive, la structure, le hasard). En revanche, les MII se réfèrent uniquement au matériel génétique hérité, qui suit des schémas spécifiques pertinents pour la santé publique que nous explorerons ci-dessous. Les différences entre IBS et IBD sont visualisées dans le schéma ci-dessous, où les sites peuvent être IBS mais pas IBD, tandis que tous les sites qui sont IBD sont IBS.
+
+<p align="center">
+![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/ibd_vs_ibs.png){width="300px"}
+</p>
+
+
+# Aperçu des données {.unnumbered}
+Ces données ont été simulées à l'aide d'un modèle simple de paludisme qui prend en compte les relations spatiales, la complexité de l'infection (COI) et la taille de la population sous un modèle de Wright-Fisher: [PolySimIBD](https://github.com/nickbrazeau/polySimIBD) - initialement publié dans [Verity/Aydemir/Brazeau et al. 2020] (https://pubmed.ncbi.nlm.nih.gov/32355199/). _Remarque_, les données simulées ont un seul chromosome qui ne fait que 1 000 paires de bases (beaucoup plus petit que les chromosomes du paludisme) et, par conséquent, a un taux de recombinaison beaucoup plus faible (pertinent pour les paramètres d'entrée `hmmIBD`.)
+<br>
+Pour ce TP, nous avons simulé cinq populations, ou dèmes : A-E. Les dèmes ont été simulés pour avoir le même nombre de personnes, ou d'hôtes ; cependant, nous avons sélectionné au hasard cinq individus de chaque dème pour subir une surveillance moléculaire et être "séquencés" (_c'est-à-dire_ dans la vraie vie, vous pouvez sélectionner cinq participants d'un village pour donner du sang total contre la collecte de sang de chaque individu dans le village). Les dèmes ont une intensité variable de transmission, ou incidence, comme indiqué par le spectre jaune-rouge dans la légende schématique. De plus, nous nous attendons à ce que les moustiques migrent entre les dèmes en fonction de la distance qui les sépare les uns des autres (_i.e._ isolement par la distance). Enfin, nous supposons que l'océan entre les dèmes A-D et E est une barrière à toute transmission du "continent" vers l'"île" (_c'est-à-dire que nous nous attendons à ce que les parasites du continent soient distincts des parasites insulaires). En résumé, les données consistent en :   
+   
+- Cinq dèmes (4 continentales, 1 île)
+- Les emplacements sont connus pour chaque dème
+- Cinq échantillons aléatoires de chaque dème
+- Incidence estimée par COI moyen par dème\*
+<br>
+_\*Comme discuté hier, le COI est une mauvaise mesure de l'incidence dans le monde réel. Pour notre modèle, il est assez corrélé (en attente) et sera utilisé comme proxy ici._
+<br>
+
+<p align="center">
+![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/sim_deme_schematic.png){width="500px"}
+</p>
+
+# Objectifs pratiques {.unnumbered}
+
+À la fin de cet exercice pratique, vous devriez être en mesure d'effectuer les tâches ci-dessous et de comprendre les concepts suivants:
++ Calculer l'IBS
++ Calculer l'IBD
++ Comprendre les forces et les faiblesses d'IBS
++ Comprendre les forces et les faiblesses des MII
+
+---------------------------------------------------------------------
+
+# Importation de données
+
+Ici, nous utiliserons le [package] `vcfR` (https://knausb.github.io/vcfR_documentation/) pour lire dans notre fichier d'appel de variantes (VCF) qui contient cinquante SNP bialléliques pour nos vingt-cinq individus à travers nos cinq populations (A, B, C, D, E ; *individus nommés* A1-5, B1-5, ...).
+
+En utilisant les compétences que vous avez acquises hier, lisez dans le VCF à partir de notre dossier de données que vous avez téléchargé depuis Github: `data/simulated_ibd.vcf.gz`. Si vous rencontrez des difficultés pour localiser le fichier sur votre ordinateur, veuillez saisir `file.choose` dans votre console pour une option interactive permettant de localiser le fichier. Nommez l'objet (le fichier vcf que vous lisez) "vcf" pour plus de simplicité.
+
+```{r}
+# participants DO NOT need to include the quiet bit
+vcf <- quiet(vcfR::read.vcfR("data/simulated_ibd.vcf.gz"))
+```
+
+## CQ initial
+Comme c'est toujours la bonne pratique, nous pouvons vérifier si notre VCF contient des données manquantes et confirmer qu'il contient le nombre de SNP et d'échantillons que nous attendons. Explorez les détails et le fonctionnement interne de notre nouveau VCF pour savoir s'il est digne de confiance (_c'est-à-dire_ les données semblent-elles raisonnables? Y a-t-il quelque chose d'étrange dans la colonne INFO?).
+
+
+_**Question de codage 1:** Utilisez la fonction "extract.gt" du package vcfR pour extraire la profondeur d'allèle du premier enregistrement (allèle référent) pour votre nouveau VCF. Tracez maintenant cette profondeur d'allèle en tant qu'exploration initiale des données à l'aide de la fonction "heatmap.bp" du package "vcfR" pour générer la figure ci-dessous._
+
+`r begin_button(1)`
+```{r}
+ad <- vcfR::extract.gt(vcf, element = "AD", as.numeric = T)
+vcfR::heatmap.bp(ad)
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+_**Question conceptuelle 1:** Le tracé ci-dessus est-il cohérent avec un VCF de haute qualité? Quelles sont les fonctionnalités douteuses?_
+
+`r begin_button(101)`
+
+_**Réponse conceptuelle 1:**_ Bien que cela semble de haute qualité, plusieurs fonctionnalités vous amèneraient à vous demander s'il s'agissait de données réelles:
+- Tous les appels d'allèles de paires de bases REF/ALT sont "N" manquants
+- Toutes les profondeurs d'allèles des locus sont de 100
+- La colonne QUALTIY est la même
+<br>
+<br>
+Ces données ont été simulées et manquent donc de nombreuses apparences du "monde réel" d'un VCF généré à partir de données de séquençage réelles. Il est toujours utile de consulter manuellement le VCF pour déterminer s'il est valide avant de commencer les analyses!
+<br>
+`r end_button()`
+`r hrule()`
+<br> 
+
+## Exploration des hets
+Ici, nous allons explorer le nombre d'appels de génotype hétérozygote que nous avons par échantillon dans notre VCF. N'oubliez pas que les appels de génotype hétérozygote nous donnent une approximation grossière du COI.
+<br>
+
+**Question de codage 2:** Encore une fois, utilisez la fonction `extract.gt` du package vcfR et extrayez les appels de génotype (`element = "GT"`) pour tous les échantillons. Ensuite, placez les données dans un format "long" en utilisant `pivot` plus longtemps. Une fois que vous avez des données "très longues", calculez l'hétérozygotie moyenne par échantillon à l'aide de la fonction "résumer" et tracez les données dans un nuage de points, comme ci-dessous.
+
+```{r, echo = F}
+# extract and tidy
+gt <- vcfR::extract.gt(vcf, element = "GT")
+gt <- dplyr::bind_cols("chrom" = vcfR::getCHROM(vcf), "pos" = vcfR::getPOS(vcf), gt)
+gt %>%
+  tibble::as_tibble() %>%
+  tidyr::pivot_longer(., cols = !c("chrom", "pos")) %>%
+  dplyr::mutate(ishet = dplyr::case_when(value == "0/0" ~ F,
+                                         value == "0/1" ~ T,
+                                         value == "1/1" ~ F)) %>%
+  dplyr::group_by(name) %>%
+  dplyr::summarise(
+    propHet = mean(ishet)) %>%
+  ggplot() +
+  geom_point(aes(x = name, y = propHet)) +
+  ylab("Proportion of Sample that is Het") +
+  xlab("") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.75, hjust = 0.5))
+```
+
+`r begin_button(2)`
+```{r}
+# extract and tidy
+gt <- vcfR::extract.gt(vcf, element = "GT")
+gt <- dplyr::bind_cols("chrom" = vcfR::getCHROM(vcf), "pos" = vcfR::getPOS(vcf), gt)
+gt %>%
+  tibble::as_tibble() %>%
+  tidyr::pivot_longer(., cols = !c("chrom", "pos")) %>%
+  dplyr::mutate(ishet = dplyr::case_when(value == "0/0" ~ F,
+                                         value == "0/1" ~ T,
+                                         value == "1/1" ~ F)) %>%
+  dplyr::group_by(name) %>%
+  dplyr::summarise(
+    propHet = mean(ishet)) %>%
+  ggplot() +
+  geom_point(aes(x = name, y = propHet)) +
+  ylab("Proportion of Sample that is Het") +
+  xlab("") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.75, hjust = 0.5))
+```
+`r end_button()`
+`r hrule()`
+<br>
+
+
+_**Question conceptuelle 2:** Reconnaissez-vous un schéma dans les appels hétérozygotes en ce qui concerne les dèmes? Quel est le rapport avec la leçon sur la polyclonalité d'hier?_
+`r bouton_commencement(102)`
+_**Réponse conceptuelle 2:**_ Les dèmes avec une intensité de transmission plus élevée ont plus d'appels hétérozygotes.
+`r bouton_fin()`
+`r hrule()`
+<br>
+
+# Intuition
+La recombinaison produit un signal puissant pour détecter la parenté génétique entre les individus. Dans le paludisme, la recombinaison se produit dans l'intestin moyen du moustique. Pour rappel, le schéma ci-dessous montre un seul moustique qui a piqué deux individus différents infectés par une même souche du parasite du paludisme, entraînant une surinfection. Les deux souches (rouge vs violet) subissent ensuite une recombinaison dans l'intestin moyen du moustique et produisent des descendants qui sont frères et devraient partager en moyenne la moitié de leurs génomes (*ils sont séparés par 1 génération*). L'arbre généalogique de droite met en évidence deux des frères et sœurs du parasite et comporte une barre grise indiquant la quantité de leur génome héritée du même parent au même emplacement génomique.
+<br>
+
+<p align="center">
+![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/ibdsiblings.png){width="500px"}
+</p>
+<br>
+
+
+## Visualiser la recombinaison
+En conséquence, une façon de conceptualiser le génome est de le faire sous forme de blocs, ou de segments, qui sont reliés entre eux, où chaque bloc a sa propre histoire ancestrale unique. Ainsi, la recombinaison peut être considérée comme le processus de "casse-bâton" qui brise les segments du génome/blocs IBD: à mesure que le temps augmente, ou que le nombre de générations augmente, les blocs génomiques partagés entre les individus deviennent plus petits. Par exemple, vous pouvez imaginer que vous avez deux sticks identiques (_i.e._ jumeaux ou infections clonales). À chaque nouvelle génération, vous devez casser votre bâton au hasard à un moment donné de sa longueur. Vous prenez ensuite vos morceaux de bâton et lancez une pièce pour déterminer si elle restera la même (« originale ») ou héritera du matériel génétique (« nouvelle »). Utilisez la fonction `view_recombo` (chargée à partir de `R/utils.R`) et explorez la relation entre le nombre de générations, ou le temps, et la longueur des blocs de recombinaison qui sont IBD entre les clones. La figure ci-dessous montre les résultats pour 20 générations.
+<br>
+<br> 
+```{r, echo=F}
+view_recombo(generations_apart = 20) +
+  labs(title = "Breakdown of Clonal Material \n over 20 Generations",
+       caption = "Note, new material is not necessarily IBD")
+
+```
+<br>
+<br>
+**Par exemple, vous pouvez exécuter la fonction avec les durées générationnelles suivantes**
+```{r, eval=F}
+view_recombo(generations_apart = 0)
+view_recombo(generations_apart = 1)
+view_recombo(generations_apart = 2)
+view_recombo(generations_apart = 3)
+view_recombo(generations_apart = 5)
+view_recombo(generations_apart = 10)
+view_recombo(generations_apart = 20)
+```
+<br>
+<br>
+_**Question conceptuelle 3:** Comment la quantité de matériel génétique "clonal" change-t-elle, ou la quantité de génome identique, change-t-elle entre les échantillons appariés à mesure que nous augmentons le nombre de générations qui les séparent?_
+`r begin_button(103)`
+_**Réponse conceptuelle 3:**_ Diminue. C'est un point important, car les "blocs" d'ADN sont notre unité d'analyse dans les MICI.
+`r end_button()`
+`r hrule()`
+<br>
+<br>
+
+# Calculs
+
+### Manipulation interne des données
+
+Ici, nous allons convertir notre objet _vcf_ que nous avons lu avec le package `vcfR` en un objet _mip_ afin d'utiliser ultérieurement le [`MIPAnalyzer` Package](https://github.com/mrc-ide/MIPanalyzer /tree/master/R) et l'estimateur du maximum de vraisemblance de l'IBD de [Verity et al. 2020] (https://pubmed.ncbi.nlm.nih.gov/32355199/). Ceci est purement pratique et ne modifie pas les données sous-jacentes dans le vcf.Veuillez copier et coller le code ci-dessous dans votre console.
+
+```{r}
+mipvcf <- MIPanalyzer::vcf2mipanalyzer_biallelic(vcfR = vcf)
+```
+
+## Identité par État
+L'identité par état (IBS) est la proportion de loci identiques divisé par tous les loci mesurés dans le génome entre deux parasites: $\mbox{parasite}_a$ et $\mbox{parasite}_b$, tel que: 
+$$IBS= \frac{\mbox{Lieux partagés}_{ab}}{\mbox{Nombre de lieux}}$$
+<br>
+Ici, nous allons effectuer des calculs IBS en utilisant notre VCF comme entrée.
+<br>
+
+_**Question de codage 3:**_ Choisissez deux échantillons de votre VCF et écrivez votre propre fonction pour calculer l'IBS entre la paire. Je recommande de commencer avec l'objet `vcfR` (par opposition à l'objet `mipanalyzer_biallelic` nouvellement créé) et d'utiliser la fonction `extract.gt` du package vcfR pour extraire les appels de génotype (`element = "GT"`) comme ci-dessus. Ensuite, subdivisez les données en deux échantillons et comparez les lieux.
+
+`r begin_button(3)`
+```{r, eval=F}
+# pick two samples
+simpleIBS <- function(vcfRobj, smpl1name, smpl2name) {
+  # extract GT information from vcf
+  gt <- vcfR::extract.gt(vcfRobj, element = "GT")
+  # subset to our samples, these are now vectors
+  smpl1 <- gt[,smpl1name]
+  smpl2 <- gt[,smpl2name]
+  # evaluate if each element in vector is the same or different = Boolean result
+  # take mean to get a proportion (binomial mean)
+  ibsprop <- mean(smpl1 == smpl2)
+  return(ibsprop)
+}
+
+simpleIBS(vcfRobj = vcf, smpl1name = "A1", smpl2name = "D1")
+
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+### Exécuter le package IBS
+Ensuite, nous utiliserons le calculateur IBS du package `MIPAnalyzer` R pour calculer l'IBS par paires pour toutes les combinaisons d'échantillons dans nos données simulées. Veuillez copier et coller le code ci-dessous dans votre console pour faciliter l'exécution de l'algorithme.
+
+```{r}
+# get IBS
+ibs <- MIPanalyzer::get_IBS_distance(x = mipvcf,
+                                     ignore_het = FALSE,
+                                     report_progress = FALSE)
+```
+
+#### Résultats nets
+La fonction renvoie les données dans un format "large", ou une [matrice de distance](https://en.wikipedia.org/wiki/Distance_matrix). Bien qu'il s'agisse d'un format parfaitement acceptable, il n'est pas considéré comme « bien rangé ».
+
+_**Question de codage 4:**_: agencez les données au format "long" à l'aide de la fonction `broom::tidy`. Renommez les colonnes pour les données longues en `c("p1", "p2", "ibsdist")`. Remarque, assurez-vous de conserver les noms d'échantillons de `colnames(vcf@gt)[2:ncol(vcf@gt)]` avant de ranger !
+
+`r begin_button(4)`
+```{r}
+# tidy result
+colnames(ibs) <- rownames(ibs) <- colnames(vcf@gt)[2:ncol(vcf@gt)]
+
+ibs_long <- broom::tidy(as.dist(ibs)) %>%  
+  magrittr::set_colnames(c("p1", "p2", "ibsdist"))
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+Il est toujours bon d'explorer nos résultats. Faisons une boîte à moustaches pour explorer la distribution de nos résultats IBS calculés.
+<br>
+_**Question de codage 5:**_: Terminé le code ci-dessous pour créer une boîte à moustaches avec des valeurs IBS sur l'axe y.
+```
+ibs_long %>%
+  ggplot() +
+  geom_boxplot(***) +
+  ylab("IBS Values") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+```
+
+`r begin_button(5)`
+```{r}
+# boxplot result
+ibs_long %>%
+  ggplot() +
+  geom_boxplot(aes(y = ibsdist),
+               outlier.colour = "red", outlier.shape=8,
+               outlier.size=4) +
+  ylab("IBS Values") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+_**Question conceptuelle 4:** Décrivez la distribution. Est-ce ce que vous attendiez?_
+`r begin_button(104)`
+_**Réponse conceptuelle 4:**_ La distribution est approximativement normale avec une moyenne d'environ 0,72. Il existe une valeur aberrante avec une valeur de 0,96. Cela suggère qu'il n'y a pas beaucoup de sites de ségrégation dans cette population.
+`r end_button()`
+`r hrule()`
+<br> 
+<br>
+
+## Identité par descendance
+L'identité par descendance (IBD) est plus compliquée à calculer que l'IBS et nécessite une modélisation statistique afin de tenir compte des fréquences de recombinaison et d'allèles de la population. Le modèle statistique le plus couramment utilisé est appelé modèle de Markov caché (voir la section * Lectures complémentaires * pour les sources recommandées). N'oubliez pas qu'un site peut être IBS mais pas nécessairement IBD comme décrit dans la section [Aperçu IBS/IBD].
+<br>
+Ici, nous utiliserons deux algorithmes différents pour calculer l'IBD : (1) un estimateur de consanguinité MLE ; (2) un modèle de Markov caché.
+<br>
+
+#### MLE MII
+Ce premier algorithme utilise un estimateur du maximum de vraisemblance des MII (voir [Verity et al. 2020](https://pubmed.ncbi.nlm.nih.gov/33057671/) pour une description mathématique). Le modèle suppose que les loci sont indépendants, ce qui permet de calculer essentiellement l'IBD comme la quantité de consanguinité, ou l'écart par rapport aux fréquences alléliques attendues, entre les fréquences alléliques par site. Le modèle est une variante de l'[équation de Hardy-Weinberg](https://en.wikipedia.org/wiki/Hardy%E2%80%93Weinberg_principle) généralisée pour l'accouplement non aléatoire (voir [Gillespie, Population Genetics: A Concise Guide] (https://public.wsu.edu/~gomulki/mathgen/materials/gillespie_book.pdf) 1ère édition, pg 86, pour en savoir plus).
+<br>
+Comme ci-dessus, nous utiliserons le package R "MIPAnalyzer" pour calculer l'IBD par paires pour toutes les combinaisons d'échantillons dans nos données simulées. Pour plus de commodité, copiez et collez le code ci-dessous dans votre console pour acquérir ces résultats.
+
+```{r}
+#......................
+# MLE IBD
+#......................
+ibd <- MIPanalyzer::inbreeding_mle(x = mipvcf,
+                                   f = seq(0.01, 0.99, 0.01),
+                                   ignore_het = FALSE,
+                                   report_progress = FALSE)
+```
+
+<br>
+_**Question de codage 6:**_: Rangeons/convertissons à nouveau nos données au format "long" en utilisant la fonction `broom::tidy`. Assurez-vous de définir votre diagonale sur 1 (auto-comparaisons), de conserver les noms des échantillons et de nommer vos colonnes `c("p1", "p2", "malecotf")`.
+
+`r begin_button(6)`
+```{r}
+# tidy result
+diag(ibd$mle) <- 1
+colnames(ibd$mle) <- rownames(ibd$mle) <- colnames(vcf@gt)[2:ncol(vcf@gt)]
+
+ibd_mle_long <- broom::tidy(as.dist(t(ibd$mle))) %>%  # note, mipanalyzer returns upper triangle
+  magrittr::set_colnames(c("p1", "p2", "malecotf"))
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+Après avoir généré nos nouveaux résultats, nous les explorons toujours! <br>
+_**Question de codage 7**_: À l'aide du code `geom_boxplot` ci-dessus, créez une boîte à moustaches avec les valeurs IBD sur l'axe des ordonnées.
+
+`r begin_button(7)`
+```{r}
+# boxplot result
+ibd_mle_long %>%
+  ggplot() +
+  geom_boxplot(aes(y = malecotf),
+               outlier.colour = "red", outlier.shape=8,
+               outlier.size=4) +
+  ylab("IBD MLE Values") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+
+_**Question conceptuelle 5:** Décrivez la distribution MLE. Est-ce ce que vous attendiez?_
+`r begin_button(105)`
+_**Réponse conceptuelle 5:**_ La distribution est centrée sur environ 0-0,1, ce qui suggère que la plupart des paires ont très peu d'IBD. Cependant, il y a quelques paires avec des niveaux élevés d'IBD.
+`r end_button()`
+`r hrule()`
+<br> 
+<br>
+
+#### IBD de HMM
+Ensuite, nous utiliserons un modèle de Markov caché (HMM) du R-package `hmmIBDR`, qui est un wrapper pour l'algorithme original `hmmIBD` (pour une description mathématique complète de `hmmIBD` voir [Schaffner & Taylor 2018]( https://pubmed.ncbi.nlm.nih.gov/29764422/)) pour calculer les estimations de l'IBD. Comme décrit dans la conférence, les HMM peuvent être considérés comme un modèle statistique qui utilise des "observations" pour déduire l'état "caché" d'un processus, où le processus est connu ou peut être décrit. Dans notre cas, nos observations sont des appels de génotype entre individus (sites identiques versus sites discordants) et notre état caché est de savoir si oui ou non ce site est une région d'héritage commun entre individus (IBD) ou non. Le processus sous-jacent est la recombinaison, qui, nous le savons, rompt les blocs génomiques et peut être décrite sur la base du taux de recombinaison connu dans le paludisme. Ce [site](https://towardsdatascience.com/markov-and-hidden-markov-model-3eec42298d75) fournit un exemple non génomique utile: imaginez que vous appelez chaque jour un ami qui habite loin et que cet ami a deux «état» d'esprit: grincheux ou heureux. Vous savez que l'humeur de votre ami dépend de la météo, mais nous ne connaissons pas la météo dans cet endroit lointain (elle nous est "cachée"). Cependant, nous pouvons déduire le temps qu'il faisait ce jour-là en fonction du fait que notre ami était heureux ou grincheux lorsque nous lui avons parlé. De plus, si nous enregistrons l'humeur de notre ami pendant une semaine, nous pourrions utiliser un modèle pour déduire le modèle météorologique sur toute cette semaine en fonction de la séquence observée de "l'état d'esprit" de notre ami, comme indiqué dans le schéma ci-dessous. Par exemple, si notre ami était G, G, G, H, H, H, H, nous pouvons soupçonner qu'il a plu pendant les trois premiers jours de la semaine, mais ensuite il y a eu un changement d'état et il a fait beau les quatre derniers jours de la semaine.
+
+<p align="center">
+![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/hmm_example.png){width="500px"}
+</p>
+
+<br>
+<br>
+
+##### Formatage pour `hmmIBD`
+Avant d'exécuter le [programme] `hmmIBD` (https://github.com/glipsnort/hmmIBD), nous allons devoir procéder à quelques manipulations de données.
+<br>
+_**Question de codage 8, partie 1**_: Créez une matrice de fréquence allélique alternative (WSAF) intra-échantillon. Tout d'abord, commencez par extraire l'allèle alternatif, ou le nombre de lectures alternatives, à un locus particulier par échantillon à l'aide de la fonction `vcfR::extract.gt(vcf, element = "AD")`: (le numérateur). Ensuite, calculez la profondeur totale des allèles par locus, par échantillon à l'aide de la fonction `vcfR::extract.gt(vcf, element = "DP")`: (le dénominateur). Maintenant, trouvez le WSAF en divisant le numérateur par le dénominateur et nommez cette nouvelle matrice `wsaf`.
+
+`r begin_button(8)`
+```{r}
+#............................................................
+# hmmIBD setup
+#...........................................................
+#......................
+# part 1
+#......................
+# File of genotype data
+ad <- vcfR::extract.gt(vcf, element = "AD")
+dp <- vcfR::extract.gt(vcf, element = "DP", as.numeric = T)
+altad <- vcfR::masplit(ad, record = 2, sort = F)
+wsaf <- altad/dp
+colnames(wsaf) <- colnames(vcf@gt)[2:ncol(vcf@gt)]
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+_**Coding Question 9, part 2**_: Afin de convertir cette trame de données en une trame de données conforme à "`hmmIBD`, ajoutez d'abord le chromosome et la position à votre matrice wsaf (en tant que première et deuxième colonnes respectivement) et le nom il `gtmat`. Ensuite, rangez votre matrice "large" au format "long" en excluant le chromosome et la position (*c'est-à-dire* nous voulons une base de données avec chromosome, position, échantillon, wsaf comme colonnes) avec la fonction: `tidyr :: pivot_longer(., cols = !c("chrom", "pos"))`. Nous allons maintenant contraindre nos calculs WSAF en appels de génotypes homozygotes en utilisant l'arrondi: `gthmm = round(value, 0)`. De plus, assurez-vous de supprimer la colonne `value` (maintenant redondante) et pour `hmmIBD` de remplacer les noms de chromosomes par des entiers: (`chrom = 1)`. Par la suite, nous allons maintenant rendre nos données "larges" à partir de longues et écrivez cette nouvelle table sur votre disque local pour `hmmIBD` en utilisant les fonctions: `tidyr::pivot_wider(data = ., names_from = "name", values_from = "gthmm")` et `readr::write_tsv(x = gtmat, fichier = " data/gt_matrix_for_hmmIBD.txt", col_names = T)`, respectivement.
+
+`r begin_button(9)`
+```{r}
+#......................
+# part 2
+#......................
+gtmat <- dplyr::bind_cols("chrom" = vcfR::getCHROM(vcf), "pos" = vcfR::getPOS(vcf), wsaf)
+gtmat <- gtmat %>%
+  tidyr::pivot_longer(., cols = !c("chrom", "pos")) %>%
+  dplyr::mutate(chrom = 1,
+                gthmm = round(value, 0)) %>%
+  dplyr::select(-c("value")) %>%
+  tidyr::pivot_wider(data = ., names_from = "name", values_from = "gthmm")
+readr::write_tsv(x = gtmat, file = "data/gt_matrix_for_hmmIBD.txt",
+                 col_names = T)
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+_**Question de codage 10, partie 3**_ : Enfin, à l'aide de votre matrice `wsaf`, calculez les fréquences alléliques au niveau de la population pour chaque locus à l'aide de la fonction suivante: `altafvec <- rowMeans(wsaf, na.rm = T) `. N'oubliez pas qu'il s'agit de la fréquence d'allèle alternative, et parce que nous avons affaire à des sites bialléliques, nous pouvons calculer la fréquence d'allèle référent en tant que 1-alt et placer le tout dans une base de données. La trame de données a besoin d'une colonne de chromosomes (sous la forme d'un nombre/entier [`chrom = 1`]), d'une colonne pour la position de la paire de bases du locus, d'une colonne de fréquence d'allèle référent et d'une colonne de fréquence d'allèle alternative. Écrivez cette table sur votre disque local avec le chemin suivant: `data/af_matrix_for_hmmIBD.txt`.
+<br>
+`r begin_button(10)`
+```{r}
+#......................
+# part 3 
+#......................
+# File of allele frequencies for the sample population. Format: tab-delimited, no header, one variant per row. Line format: <chromosome (int)> <position (bp, int)> <allele 1 freq> <all 2 freq> [<all 3 freq>] ... The genotype and frequency files must contain exactly the same variants, in the same order. If no file is supplied, allele frequencies are calculated from the input data file.
+altafvec <- rowMeans(wsaf, na.rm = T)
+afmat <- dplyr::bind_cols("chrom" = vcfR::getCHROM(vcf),
+                          "pos" = vcfR::getPOS(vcf),
+                          1-altafvec, altafvec) %>%
+  dplyr::mutate(chrom = 1)
+readr::write_tsv(afmat, file = "data/af_matrix_for_hmmIBD.txt", col_names = F)
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+Explorez la [documentation hmmIBD](https://github.com/glipsnort/hmmIBD) pour une justification de ce munging que nous avons fait ci-dessus et une clarification supplémentaire de la mise en garde ci-dessous.
+
+_**Avertissement**: L'algorithme `hmmIBD` suppose que tous les échantillons sont monoclonaux. De ce fait, il n'accepte pas nativement les appels hétérozygotes. En tant qu'utilisateur, nous avons deux options : (1) définir ces appels hétérozygotes comme manquants (une approche conservatrice), ou (2) faire une hypothèse forte sur ce que signifie un appel hétérozygote (une approche agressive). Ici, j'ai forcé les échantillons à être monoclonaux en estimant leurs fréquences alléliques dans l'échantillon et en arrondissant à la variante la plus proche._
+
+<br>
+<br>
+<br>
+
+##### Exécution hmmIBD
+Nous allons maintenant exécuter le programme `hmmIBD` pour calculer l'IBD par paires. Pour plus de commodité, copiez et collez le code ci-dessous dans votre console pour acquérir ces résultats.
+
+```{r}
+#......................
+# hmmIBD run
+#......................
+# NB, participants do not need to use the "quiet" function 
+tf <- tempfile(pattern = "output_simdat")
+out <- quiet(hmmibdr::hmm_ibd(input_file = "data/gt_matrix_for_hmmIBD.txt",
+                              allele_freqs =  "data/af_matrix_for_hmmIBD.txt",
+                              rec_rate = 1e-2, # note the small recombo rate relative to what would be expected in malaria
+                              output_file = tf))
+
+# hmmIBD tidy
+ibd_hmm_long <- tibble::tibble(
+  p1 = out$fract$sample1,
+  p2 = out$fract$sample2,
+  hmm = out$fract$fract_sites_IBD)
+
+
+```
+
+Encore une fois, nous explorons toujours nos résultats! <br>
+_**Question de codage 11**_: utilisez votre code `geom_boxplot` pour créer une boîte à moustaches avec les valeurs IBD HMM sur l'axe des ordonnées.
+
+`r begin_button(11)`
+```{r}
+# boxplot result
+ibd_hmm_long %>%
+  ggplot() +
+  geom_boxplot(aes(y = hmm),
+               outlier.colour = "red", outlier.shape=8,
+               outlier.size=4) +
+  ylab("IBD HMM Values") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+_**Question conceptuelle 6:** Décrivez la distribution HMM. Est-ce ce que vous attendiez?_
+`r begin_button(106)`
+_**Réponse conceptuelle 6:**_ La distribution est centrée sur environ 0-0,05, ce qui suggère que la plupart des paires ont très peu d'IBD. Cela suggère des niveaux de parenté inférieurs à ceux démontrés dans la distribution MLE ci-dessus. Encore une fois, il y a quelques paires avec des niveaux élevés d'IBD.
+`r end_button()`
+`r hrule()`
+<br> 
+<br>
+
+#### Contraste MLE vs HMM
+Comme décrit ci-dessus, les calculs IBD du modèle MLE supposent des lieux indépendants, tandis que le modèle HMM exploite la recombinaison pour détecter la parenté. Cependant, "hmmIBD" nécessite des infections monoclonales et nous avons dû "contraindre" nos données pour qu'elles correspondent à cette hypothèse. Ici, nous allons explorer comment les résultats MLE IBD et HMM IBD diffèrent.
+
+<br>
+_**Question de codage 12**_: Utilisez la couche ggplot `geom_point` pour créer un tracé qui met en contraste les deux calculs différents. Vous devrez joindre les données par échantillon à l'aide de la fonction suivante: `left_join(ibd_mle_long, ibd_hmm_long, by = c("p1", "p2"))` en terminant le morceau de code ci-dessous.
+
+```
+dplyr::left_join(***) %>%
+  ggplot() +
+  geom_point(***) +
+  theme_bw() +
+  labs(x = "IBD from HMM", y = "IBD from MLE")
+```
+
+`r begin_button(12)`
+```{r}
+dplyr::left_join(ibd_mle_long, ibd_hmm_long, by = c("p1", "p2")) %>%
+  ggplot() +
+  geom_point(aes(x = hmm, y = malecotf)) +
+  theme_bw() +
+  labs(x = "IBD from HMM", y = "IBD from MLE")
+
+
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+_**Question conceptuelle 7:** Pourquoi ces deux résultats seraient-ils différents? Existe-t-il des hypothèses différentes dans les modèles?_
+`r begin_button(107)`
+_**Réponse conceptuelle 7:**_ N'oubliez pas que `hmmIBD` suppose que les échantillons sont monoclonaux. Par conséquent, les appels hétérozygotes décomposeront rapidement les blocs IBD sous notre simple «force» à l'hypothèse monoclonale.
+`r end_button()`
+<br> 
+<br>
+
+#### Contraste IBS vs HMM-IBD
+Comparez IBS et les résultats `hmmIBD` dans un nuage de points.
+_**Question de codage 12**_: À l'aide de la couche ggplot "geom_point", créez un graphique qui met en contraste les estimations IBS et les estimations MLE IBD. Ajoutez une ligne de régression pour explorer la corrélation à l'aide de la couche `geom_smooth(aes(x = malecotf, y = ibsdist), method = "lm")`. Notez que vous devrez joindre les données par exemple à l'aide de la fonction suivante: `left_join(ibs_long, ibd_mle_long, by = c("p1", "p2"))` avant d'utiliser ggplot.
+`r begin_button(12)`
+```{r}
+dplyr::left_join(ibs_long, ibd_hmm_long, by = c("p1", "p2")) %>%
+  ggplot() +
+  geom_point(aes(x = hmm, y = ibsdist)) +
+  geom_smooth(aes(x = hmm, y = ibsdist), method = "lm") +
+  xlim(c(0,1)) + ylim(c(0,1)) +
+  labs(x = "HMM-IBD Estimates", y = "IBS Distance") +
+  theme_bw()
+
+```
+`r end_button()`
+`r hrule()`
+<br>
+
+_**Question conceptuelle 8:** En quoi les estimations de l'IBS et de l'IBD diffèrent-elles? Quelle est la plus petite valeur pour IBS par rapport à IBD? Pourquoi peuvent-ils être différents?_
+`r begin_button(108)`
+_**Réponse conceptuelle 8:**_ IBS est affecté par les fréquences d'allèles de la population dans une population et peut surestimer la parenté lorsque les allèles sont fixés dans une population pour des raisons autres que l'hérédité (c'est-à-dire IBD = 0, IBS > 0,5, vu sur le côté gauche du tracé). La fixation des allèles est particulièrement fréquente dans les petites populations en raison de la dérive génétique (comme c'était le cas dans cette simulation) ou en raison de la sélection. Par conséquent, bien que des valeurs élevées d'IBS indiquent probablement des niveaux élevés de parenté, des valeurs inférieures d'IBS sont plus difficiles à interpréter.
+`r end_button()`
+`r hrule()`
+<br> 
+
+### Résumé/Enregistrement
+À ce stade, vous devriez avoir créé trois objets de résultat R:   
+```
+ibs_long     
+ibd_mle_long     
+ibd_hmm_long     
+```  
+Si vous rencontrez des problèmes de calcul ou si le temps est un facteur limitant, veuillez consulter le répertoire `results/`, où vous pourrez lire les résultats.
+
+<br>
+<br>
+<br>
+<br>
+
+# IBD appliqué
+Dans cette section, nous nous concentrerons sur l'utilité de l'IBD pour des applications réalistes liées aux efforts de contrôle et d'élimination. Pour cette section, nous nous concentrerons sur les estimations MLE-IBD (par rapport aux estimations HMM-IBD).
+
+# IBD appliqué
+Dans cette section, nous nous concentrerons sur l'utilité de l'IBD pour des applications réalistes liées aux efforts de contrôle et d'élimination. Pour cette section, nous nous concentrerons sur les estimations MLE-IBD (par rapport aux estimations HMM-IBD).
+<br>
+_**Question de codage 13**_: Utilisez la couche ggplot `geom_histogram` pour créer un graphique qui montre la distribution des estimations MLE IBD. Nous ajouterons un graphique en encart pour explorer la queue de cette distribution. Explorez ce [blog](https://meghan.rbind.io/blog/cowplot/) pour apprendre à créer des tracés avec des encarts à l'aide du package "cowplot".
+`r begin_button(13)`
+```{r}
+mainplot <- ibd_mle_long %>%
+  ggplot() +
+  geom_histogram(aes(x=malecotf, y = (..count../sum(..count..))*100),
+                 color = "#000000", fill = "#d9d9d9") +
+  xlab("IBD") + ylab("frequency (%)") +
+  theme_classic()
+
+insetplot <- ibd_mle_long %>%
+  ggplot() +
+  geom_histogram(aes(x=malecotf, y = (..count../sum(..count..))*100),
+                 color = "#000000", fill = "#d9d9d9") +
+  xlab("IBD") + ylab("frequency (%)") +
+  theme_classic() +
+  coord_cartesian(xlim = c(0.5,1), ylim = c(0,0.8)) +
+  theme_bw() +
+  theme(panel.background = element_rect(fill = "transparent"),
+        plot.background = element_rect(fill = "transparent"))
+# cowplot
+cowplot::ggdraw() +
+  cowplot::draw_plot(mainplot, x = 0, y = 0, width = 1, height = 1, scale = 1) +
+  cowplot::draw_plot(insetplot, x = 0.5, y= 0.3, width = 0.4, height = 0.4)
+
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+_**Question conceptuelle 9:** Comment décririez-vous cette distribution? Vous attendriez-vous à autant d'échantillons non liés? Qu'en est-il de la proportion de paires hautement liées dans la queue de la distribution?_
+<br>
+<br>
+`r begin_button(109)`
+_**Réponse conceptuelle 9:**_ La distribution est similaire à notre boîte à moustaches ci-dessus, démontrant qu'il existe un grand nombre de paires non liées à faiblement liées. Il faut s'y attendre dans de nombreuses populations, à moins qu'il n'y ait des raisons pour une grande quantité de consanguinité (voir conférence : facteurs qui affectent la parenté). Cependant, il y a une "queue" avec quelques paires très liées. Cette queue est intéressante !
+`r end_button()`
+`r hrule()`
+<br> 
+<br>
+
+## Intensité de transmission
+Comme nous l'avons vu lors de l'examen de la recombinaison au début de la pratique, à mesure que le nombre d'événements de recombinaison augmente, nous nous attendons à ce que l'IBD diminue. En conséquence, dans les zones où l'intensité de transmission est plus élevée, modélisée ici par des différences de COI, nous pouvons nous attendre à ce que l'IBD soit moindre.
+
+### Intra-Deme IBD vs COI
+En regroupant les échantillons selon leurs dèmes d'origine, nous pouvons estimer la quantité de consanguinité au sein d'un dème, ou l'IBD intra-dème. Ici, nous allons lire dans le fichier `data/metadata.RDS` et calculer l'IBD moyen par dème pour obtenir l'IBD intra-dème. Nous allons ensuite tracer l'IBD intra-dème par rapport au COI moyen simulé.
+<br> 
+<br>
+_**Coding Question 13, part 1**_: Lisez les métadonnées à l'aide du code suivant: `readRDS("data/metadata.RDS")`. Combinez ensuite nos métadonnées à la trame de données `ibd_mle_long` en utilisant deux appels `left_join` différents. Notez que vous devrez créer deux dataframes "métadonnées" différents avec une colonne nommée "p1" (échantillon 1) et une avec une colonne nommée "p2" (échantillon 2). Renommez les extensions ".x" et ".y" créées par `left_join` en "_p1" et "_p2", respectivement.
+Après avoir joint ces données ensemble, vous devriez avoir un nouveau dataframe avec des noms de colonnes: `p1, p2, malectof, deme_p1, coimeans_p1, longnum_p1, latnum_p1, deme_p2, coimeans_pe2, longnum_p2, latnum_p2`. Nous allons utiliser cette base de données pour les prochains défis, alors nommez-la `ibd_mle_long_mtdt`.
+<br>
+`r begin_button(13)`
+```{r}
+#......................
+# part 1
+#......................
+mtdt <- readRDS("data/metadata.RDS")
+# data munging
+mtdt_x <- mtdt %>%
+  dplyr::rename(p1 = smpl)
+mtdt_y <- mtdt %>%
+  dplyr::rename(p2 = smpl)
+ibd_mle_long_mtdt <- dplyr::left_join(ibd_mle_long, mtdt_x, by = "p1") %>%
+  dplyr::left_join(., mtdt_y, by = "p2") %>%
+  rename_with(., ~gsub(".x", "_p1", .x, fixed = T)) %>%
+  rename_with(., ~gsub(".y", "_p2", .x, fixed = T))
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+_**Question conceptuelle 10:** Décrivez votre nouveau cadre de données._
+`r begin_button(110)`
+_**Réponse conceptuelle 10:**_ Nous avons une longue trame de données bien rangée qui contient des comparaisons par paires opposant l'échantillon un (p1) et l'échantillon deux (p2) aux métadonnées correspondantes: deme, coi, coordonnées GPS.
+`r end_button()`
+`r hrule()`
+<br> 
+<br>  
+
+_**Code Question 14, partie 2**_: Calculer l'IBD intra-dème. Maintenant, créez un sous-ensemble de votre dataframe pour ne contenir que les lignes où les comparaisons par paires proviennent du même dème: `dplyr::filter(deme_p1 == deme_p2)`. Regroupez par dèmes (`group_by(deme_p1)`) et utilisez la fonction `summarise` pour calculer la moyenne intra-dème IBD et le COI moyen (remarque, le COI est le même dans un dème). Utilisez ensuite la couche `geom_point` dans ggplot pour comparer les calculs COI et IBD intra-dème.
+`r begin_button(14)`
+```{r}
+#......................
+# part 2: plot within IBD
+#......................
+ibd_mle_long_mtdt %>%
+  dplyr::filter(deme_p1 == deme_p2) %>%
+  dplyr::group_by(deme_p1) %>%
+  dplyr::summarise(
+    withinIBD = mean(malecotf),
+    COI = unique(coimeans_p1)) %>%
+  ggplot() +
+  geom_point(aes(x = withinIBD, y = COI)) +
+  labs(x = "Within Deme IBD", y = "Simulated Mean COI",
+       caption = "Remember, COI is a poor estimate of incidence. IBD is also affected by multiple factors, including randomness.") +
+  theme_classic()
+
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+_**Question conceptuelle 11:** Existe-t-il ici une corrélation entre le COI moyen et l'IBD au sein du même?_
+`r begin_button(111)`
+_**Réponse conceptuelle 11:**_ Non, mais le COI le plus bas était associé au plus grand au sein de la MII.
+`r end_button()`
+`r hrule()`
+<br> 
+<br>
+_**Question conceptuelle 12:** Pourquoi nos attentes concernant la relation entre les MICI intra-dème et l'intensité de la transmission ne correspondent-elles pas à la réalité?_
+`r begin_button(112)`
+_**Réponse conceptuelle 12:**_ Nos attentes ne correspondent pas toujours aux données réalisées. Il existe également de multiples variables de confusion ici, notamment: la migration et l'échantillonnage incomplet.
+`r end_button()`
+`r hrule()`
+<br> 
+<br>
+
+## Isolement par distance
+Ensuite, nous explorerons le concept d'isolement par la distance, qui est la théorie selon laquelle à mesure que les paires s'éloignent dans l'espace, elles devraient être moins liées (_c'est-à-dire_ des paires plus proches sont plus susceptibles de se reproduire). Ce concept est basé sur des relations spatiales, mais peut également être conceptualisé en tant que temps (les paires qui sont séparées par plusieurs générations de temps sont moins susceptibles d'être liées).
+
+_**Question de codage 15, partie 1**_: Calculer la [distance du grand cercle](https://en.wikipedia.org/wiki/Great-circle_distance). Tout d'abord, nous lirons dans nos distances GC pré-calculées : `readRDS(data/deme_gc_dist.RDS)`. Utilisez un appel `left_join` pour fusionner ces données tout en créant une nouvelle trame de données appelée `ibd_mle_long_mtdt_dist`. Maintenant, nous allons "répartir" nos distances en convertissant cette valeur continue en une forme discrétisée à l'aide de la fonction "couper":
+```
+cut(x = c(ibd_mle_long_mtdt_dist$distance),
+breaks = c(0, 1e-26, seq(40, 120, by = 40), Inf),
+right = F, 
+labels = c("Within", "40km", "80km", "120km", ">120km"))
+```
+<br>
+
+`r begin_button(15)`
+```{r}
+
+#......................
+# part 1
+#......................
+gcdist <- readRDS("data/deme_gc_dist.RDS")
+ibd_mle_long_mtdt_dist <- dplyr::left_join(ibd_mle_long_mtdt, gcdist, by = c("deme_p1", "deme_p2")) %>%
+  dplyr::mutate(distance = ifelse(is.na(distance), 0, distance))
+ibd_mle_long_mtdt_dist$distance_cat <- 
+  cut(x = c(ibd_mle_long_mtdt_dist$distance), 
+      breaks = c(0, 1e-26, seq(40, 120, by = 40), Inf),
+      right = F, 
+      labels = c("Within", "40km", "80km", "120km", ">120km"))
+
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+_**Question de codage 16, partie 2 **_: À l'aide de notre nouveau cadre de données, `ibd_mle_long_mtdt_dist`, regroupez par la colonne `distance_cat` créée avec la fonction `cut` ci-dessus et calculez les résumés suivants (`summarise`): moyenne IBD, écart type IBD, erreur standard IBD, IC inférieur à 95% pour IBD et IC supérieur à 95% pour IBD. Vous pouvez consulter la pratique de puissance, partie 1 pour un rappel sur ces statistiques.
+`r begin_button(16)`
+```{r}
+#......................
+# part 2
+#......................
+plotdat <- ibd_mle_long_mtdt_dist %>%
+  dplyr::group_by(distance_cat) %>%
+  dplyr::summarise(
+    n = n(),
+    meanIBD = mean(malecotf),
+    sdIBD = sd(malecotf),
+    seIBD = sdIBD/sqrt(n),
+    U95CI = meanIBD + 1.96 * seIBD,
+    L95CI = meanIBD - 1.96 * seIBD) 
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+
+_**Coding Question 17, part 3**_: Using the `geom_pointrange` layer in ggplot, plot the mean IBD on the y-axis and the categorized GC distance on the x-axis. For the `geom_pointrange` aesthetics, you will need to specify: `y = meanIBD, ymin = L95CI, ymax = U95CI`. 
+
+`r begin_button(17)`
+```{r}
+
+#......................
+# part 3
+#......................
+plotdat %>% 
+  ggplot() +
+  geom_pointrange(aes(x = distance_cat, y = meanIBD, ymin = L95CI, ymax = U95CI)) +
+  scale_size(range = c(0, 1)) +
+  labs(y = "Mean IBD", x = "GC Distance", title = "Isolation by Distance") +
+  theme_classic() +
+  theme(plot.title = element_text(family = "Helvetica", face = "bold", hjust = 0.5, size = 14),
+        axis.title = element_text(family = "Helvetica", face = "bold", hjust = 0.5, size = 12))
+
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+_**Conceptual Question 13:** How would you describe this relationship? Does it make sense?_
+<br>
+`r begin_button(113)`
+_**Conceptual Answer 13:**_ IBD decays with increasing distance. This follows the concept of isolation by distance. 
+`r end_button()`
+`r hrule()`
+<br> 
+<br> 
+
+### Network Analysis
+We can also use networks to determine the connectivity of our paired samples. Networks helps us visualize connections that we may not expect and are a useful tool for exploratory data analysis. Additionally, we can use [community detection algorithms](https://towardsdatascience.com/community-detection-algorithms-9bd8951e7dae) to explore which samples may "cluster" together based on relatedness. One way to conceptualize community detection algorithms is to consider that networks measure "popularity" and that samples that are "cliques" should cluster together. Alternatively, a sample may be "friends" with everyone and becomes very central or important to the network. These distinctions may be helpful to determine which demes are particularly connected and may be contributing to sink-source dynamics (see [Wesolowksi _et al._ 2018](https://pubmed.ncbi.nlm.nih.gov/30333020/) for further information on sink-source dynamics).
+<br>
+Read this STDHA [blog](http://sthda.com/english/articles/33-social-network-analysis/136-network-analysis-and-manipulation-using-r) networks and on community detection algorithms and use the R packages: [tidygraph](https://tidygraph.data-imaginist.com/index.html) and [ggraph](https://ggraph.data-imaginist.com/) to try to generate the figure below. 
+
+_**Coding Question 18**_: Use the `tidygraph::as_tbl_graph` function to convert our`ibd_mle_long` into an a `tbl_graph` for easier network analyses. Then calculate the compunity membership using `tidygraph::group_louvain(weights = malecotf)))` function and plot the resulting network with `ggraph::ggraph(layout = 'kk')`. Make sure to color in the nodes by community using the `geom_node_point` layer and proper aesthetic: `ggraph::geom_node_point(aes(color = community)`. 
+
+`r begin_button(18)`
+```{r}
+adj_graph <- ibd_mle_long %>%
+  tidygraph::as_tbl_graph(., directed = F)
+
+ibd_mle_long %>%
+  tidygraph::as_tbl_graph(., directed = F) %>%
+  dplyr::mutate(community = as.factor(tidygraph::group_louvain(weights = malecotf))) %>%
+  tidygraph::activate("edges") %>%
+  ggraph::ggraph(layout = 'kk') +
+  ggraph::geom_edge_link(aes(width = malecotf,
+                             color = malecotf)) +
+  ggraph::geom_node_point(aes(color = community),
+                          size = 3) +
+  ggraph::scale_edge_width_continuous(range = c(0, 1), guide = "none") +
+  ggraph::geom_node_text(aes(label = name), repel = T) +
+  ggraph::scale_edge_color_viridis("IBD", values = c(0,1), option = "plasma") +
+  scale_color_brewer(palette = "Set1") +
+  ggraph::theme_graph() +
+  theme(legend.position = "bottom")
+
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+_**Coding Question 19**_: While that graph is interesting, it may be hard to interpret given all of the low-level relatedness connections. Let's prune those and keep only connections with IBD $\geq$ 0.1. Use the `dplyr::filter` function to perform this task. 
+`r begin_button(19)`
+```{r}
+
+ibd_mle_long %>%
+  dplyr::filter(malecotf >= 0.1) %>% 
+  tidygraph::as_tbl_graph(., directed = F) %>%
+  dplyr::mutate(community = as.factor(tidygraph::group_louvain(weights = malecotf))) %>%
+  tidygraph::activate("edges") %>%
+  ggraph::ggraph(layout = 'kk') +
+  ggraph::geom_edge_link(aes(width = malecotf,
+                             color = malecotf)) +
+  ggraph::geom_node_point(aes(color = community),
+                          size = 3) +
+  ggraph::scale_edge_width_continuous(range = c(0, 1), guide = "none") +
+  ggraph::geom_node_text(aes(label = name), repel = T) +
+  ggraph::scale_edge_color_viridis("IBD", values = c(0,1), option = "plasma") +
+  scale_color_brewer(palette = "Set1") +
+  ggraph::theme_graph() +
+  theme(legend.position = "bottom")
+
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+
+_**Conceptual Question 14:** What do you notice about the above network? Are there any isolated cliques? Are there any very "popular" samples?_
+`r begin_button(114)`
+_**Conceptual Answer 14:**_ All demes appear to have some degree of connectivity - albeit some demes have lower connectivity than others. For example, Deme E seems to be relatively clustered/isolated relative to the other demes (but still does have connections to the mainland). 
+`r end_button()`
+`r hrule()`
+<br> 
+
+## High Related Pairs
+Here, we will subset to highly related pairs, defined as pairs that are at least meiotic siblings (_i.e._ share half of their genome). We will then map these between deme connections to determine if there is evidence of genetic sharing between demes. In this section, we will practice layering multiple dataframes onto a single plot to generate a figure like below. 
+```{r, echo=F}
+simmap <- readRDS("data/sim_map_sf.RDS")
+mtdtclst <- mtdt %>%
+  dplyr::select(c("deme", "longnum", "latnum")) %>%
+  dplyr::filter(!duplicated(.))
+# find btwn sibs
+highbtwnpairs <- ibd_mle_long_mtdt %>%
+  dplyr::filter(malecotf >= 0.25) %>% 
+  dplyr::filter(deme_p1 != deme_p2)
+# find within
+withinpairs <- ibd_mle_long_mtdt %>%
+  dplyr::filter(malecotf >= 0.25) %>%
+  dplyr::filter(deme_p1 == deme_p2)
+#plot
+ggplot() +
+  geom_sf(data = simmap) +
+  geom_curve(data = highbtwnpairs,
+             alpha = 0.5, size = 1.1,
+             aes(x = longnum_p1, y = latnum_p1,
+                 xend = longnum_p2, yend = latnum_p2,
+                 color = malecotf), show.legend = T) +
+  geom_point(data = mtdtclst, aes(x = longnum, y = latnum),
+             show.legend = F, size = 3) +
+  geom_point(data = withinpairs, aes(x = longnum_p1, y = latnum_p1),
+             show.legend = F,
+             color = "#0C73B2", shape = 15, size = 3) +
+  scale_color_viridis_c("Pairwise IBD", option="plasma", direction = 1, values = c(0,1)) +
+  labs(caption = "Locations that contain highly related pairs within \n the deme are colored as blue squares; \n between deme connections are shown are curved lines") +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank())
+```
+
+
+_**Coding Question 20, part 1**_: Here we will set up our data for making the map/plot. Read in the simulated map with the following function: `readRDS("data/sim_map_sf.RDS")`. Then make a condensed version of the metadata that just contains one row of coordinates for each deme. Next, make a dataframe containing highly related pairs between demes by subsetting the `ibd_mle_long_mtdt` to at least meiotic siblings: `dplyr::filter(malecotf >= 0.25)` and by excluding pairs that are from the same deme: ` dplyr::filter(deme_p1 != deme_p2)`. Finally, create a dataframe of demes that contain highly related pairs by subsetting the `ibd_mle_long_mtdt` to at least meiotic siblings: `dplyr::filter(malecotf >= 0.25)` and by including only pairs that are from the same deme: ` dplyr::filter(deme_p1 == deme_p2)`. You know have four objects ready for plotting: (1) map, (2) cluster locations, (3) highly related between deme pairs, (4) high related within deme pairs. 
+
+`r begin_button(20)`
+```{r}
+#......................
+# part 1
+#......................
+# read in map base
+simmap <- readRDS("data/sim_map_sf.RDS")
+mtdtclst <- mtdt %>%
+  dplyr::select(c("deme", "longnum", "latnum")) %>%
+  dplyr::filter(!duplicated(.))
+
+# find btwn sibs
+highbtwnpairs <- ibd_mle_long_mtdt %>%
+  dplyr::filter(malecotf >= 0.25) %>% 
+  dplyr::filter(deme_p1 != deme_p2)
+
+# find within
+withinpairs <- ibd_mle_long_mtdt %>%
+  dplyr::filter(malecotf >= 0.25) %>%
+  dplyr::filter(deme_p1 == deme_p2)
+```
+`r end_button()`
+`r hrule()`
+<br> 
+
+_**Coding Question 21, part 2**_: We will now plot these dataframes. First make a map base using the `geom_sf` layer. Next add a layer for cluster locations using `geom_point(data = mtdtclst, aes(x = longnum, y = latnum)`. Now we will color in the demes that contain highly related pairs within: `geom_point(data = withinpairs, aes(x = longnum_p1, y = latnum_p1), color = "blue"`. Finally, we will add a connections between pairs across different demes from our highly related between pairs dataframe: `geom_curve(data = highbtwnpairs, aes(x = longnum_p1, y = latnum_p1, xend = longnum_p2, yend = latnum_p2, color = malecotf)`. Your plot contains both spatial and relatedness data in a easily communicated graph. Note, you can change the order of the layers in order to have either points or curves on top (remember, ggplot layers follow the order of the code). 
+
+`r begin_button(21)`
+```{r}
+# make plot
+ggplot() +
+  geom_sf(data = simmap) +
+  geom_curve(data = highbtwnpairs,
+             alpha = 0.5, size = 1.1,
+             aes(x = longnum_p1, y = latnum_p1,
+                 xend = longnum_p2, yend = latnum_p2,
+                 color = malecotf), show.legend = T) +
+  geom_point(data = mtdtclst, aes(x = longnum, y = latnum),
+             show.legend = F, size = 3) +
+  geom_point(data = withinpairs, aes(x = longnum_p1, y = latnum_p1),
+             show.legend = F,
+             color = "#0C73B2", shape = 15, size = 3) +
+  scale_color_viridis_c("Pairwise IBD", option="plasma", direction = 1, values = c(0,1)) +
+  theme_minimal()
+
+```
+`r end_button()`
+`r hrule()`
+<br>
+_**Conceptual Question 15:** What can highly related pairs tell you? How do they relate to transmission events? Can you use them to estimate genetic corridors or evidence of gene flow? Do you think there is active transmission between the mainland and island (see original study hypothesis)?_
+<br>
+`r begin_button(105)`
+_**Conceptual Answer 15:**_ Highly related pairs provide evidence of very recent transmission events. For example, meiotic siblings (IBD $geq$ 0.5) are expected to only be separated by a single generation (under certain assumptions: infinite population size, random breeding, etc). As a result, highly related pairs provide strong evidence of active corridors of gene flow. Thus, there is evidence that there is active transmission between the main and island! Further epidemiologic data would be needed to confirm our new suspicion that the mainland is the "source" that is seeding the island ("sink").  
+`r end_button()`
+`r hrule()`
+<br> 
+
+

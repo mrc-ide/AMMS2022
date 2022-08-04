@@ -205,7 +205,6 @@ gt %>%
   theme(axis.text.x = element_text(angle = 45, vjust = 0.75, hjust = 0.5))
 ```
 `r end_button()`
-`r hrule()`
 <br>
 
 
@@ -217,7 +216,7 @@ _**Conceptual Answer 2:**_ Demes with higher transmission intensity have more he
 <br>
 
 # Intuition
-Recombination produces a powerful signal for detecting genetic relatedness between individuals. In malaria, recombination occurs in the mosquito midgut. As a reminder, the schematic below shows a single mosquito that has bitten two different individuals infected with a single strain of the malaria parasite, resulting in a superinfection. The two strains (red vs purple) then undergo recombination in the mosquito midgut and produce progeny that are siblings and expected to share half of their genomes on average (*they are seperated by 1 generaton*). The pedigree on the right highlights two of the parasite siblings and has a grey bar indicating how much of their genome was inherited from the same parent in the same genomic location. 
+Recombination produces a powerful signal for detecting genetic relatedness between individuals. In malaria, recombination occurs in the mosquito midgut. As a reminder, the schematic below shows a single mosquito that has bitten two different individuals infected with a single strain of the malaria parasite, resulting in a superinfection. The two strains (red vs purple) then undergo recombination in the mosquito midgut and produce progeny that are siblings and expected to share half of their genomes on average (*they are separated by 1 generation*). The pedigree on the right highlights two of the parasite siblings and has a grey bar indicating how much of their genome was inherited from the same parent in the same genomic location. 
 <br>
 <p align="center">
 ![](https://raw.githubusercontent.com/mrc-ide/AMMS2022/master/IBD/R_ignore/images/ibdsiblings.png){width="500px"}
@@ -308,7 +307,7 @@ ibs <- MIPanalyzer::get_IBS_distance(x = mipvcf,
                                      report_progress = FALSE)
 ```
 
-#### Tidy Results
+#### Tidy Results {.unnumbered}
 The function returns the data in a "wide" format, or a [distance matrix](https://en.wikipedia.org/wiki/Distance_matrix). While this a perfectly acceptable format, it is not considered "tidy". 
 
 _**Coding Question 4:**_: Wrangle the data into "long" format using `broom::tidy` function. Rename the columns for the long data to `c("p1", "p2", "ibsdist")`. Note, make sure to preserve the sample names from `colnames(vcf@gt)[2:ncol(vcf@gt)]` prior to tidying!
@@ -369,7 +368,7 @@ Identity by Descent (IBD) is more complicated to calculate than IBS and requires
 Here, we will use two different algorithms to calculate IBD: (1) an MLE inbreeding estimator; (2) a hidden Markov model.
 <br>
 
-#### MLE IBD
+#### MLE IBD {.unnumbered}
 This first algorithm uses a maximum likelihood estimator of IBD (see [Verity et al. 2020](https://pubmed.ncbi.nlm.nih.gov/33057671/) for a mathematical description). The model assumes that loci are independent, which allows for IBD to be essentially calculated as the amount of inbreeding, or deviation from the expected allele frequencies, between allele frequencies per site. The model is a variation of the Generalized [Hardy-Weinberg equation](https://en.wikipedia.org/wiki/Hardy%E2%80%93Weinberg_principle) for nonrandom mating (see [Gillespie, Population Genetics: A Concise Guide](https://public.wsu.edu/~gomulki/mathgen/materials/gillespie_book.pdf) 1st edition, pg 86, for further reading). 
 <br>
 As above, we will use `MIPAnalyzer` R package to calculate pairwise IBD for all combinations of samples in our simulated data. For convenience, copy and paste the code below into your console to acquire these results. 
@@ -423,13 +422,13 @@ ibd_mle_long %>%
 
 _**Conceptual Question 5:** Describe the MLE distribution. Is this what you expected?_
 `r begin_button(105)`
-_**Conceptual Answer 5:**_ The distribution is centered over approximatley 0-0.1, suggesting that most pairs have very little IBD. However, there are a few pairs with high levels of IBD. 
+_**Conceptual Answer 5:**_ The distribution is centered over approximately 0-0.1, suggesting that most pairs have very little IBD. However, there are a few pairs with high levels of IBD. 
 `r end_button()`
 `r hrule()`
 <br> 
 <br>
 
-#### IBD from HMM 
+#### IBD from HMM {.unnumbered}
 Next, we will use a hidden Markov model (HMM) from the R-package `hmmIBDR`, which is a wrapper for the original `hmmIBD` algorithm (for a full mathematical description of `hmmIBD` see [Schaffner & Taylor 2018](https://pubmed.ncbi.nlm.nih.gov/29764422/)) to calculate IBD estimates. As described in the lecture, HMMs can be thought of a statistical model that uses "observations" to infer the "hidden" state of some process, where the process is known or can be described. In our case, our observations are genotype calls between individuals (identical sites versus discordant sites) and our hidden state is whether or not that site is a region of common inheritance between individuals (IBD) or not. The underlying process is recombination, which we know breaks up genomic blocks, and can be described based on the known recombination rate in malaria. This [site](https://towardsdatascience.com/markov-and-hidden-markov-model-3eec42298d75) provides a useful non-genomic example: imagine you call a friend every day that lives far away, and that friend has two "state's" of mind: grumpy or happy. You know that your friend's mood is dependent on the weather, but we don't know the weather in this far away place (it is "hidden" from us). However, we can infer what the weather was that day based on whether our friend was happy or grumpy when we spoke to them. Moreover, if we recorded our friend's mood for a week, we could use a model to infer the weather pattern over that entire week based on the observed sequence of our friend's "state" of mind as shown in the schematic below. For example, if our friend was G,G,G,H,H,H,H we may suspect that it rained for the first three days of the week but then there was a state change and it was sunny the last four days of the week.  
 
 <p align="center">
@@ -439,7 +438,7 @@ Next, we will use a hidden Markov model (HMM) from the R-package `hmmIBDR`, whic
 <br>
 <br>
 
-##### Formatting for `hmmIBD`
+##### Formatting for `hmmIBD` {.unnumbered}
 Prior to running `hmmIBD` [program](https://github.com/glipsnort/hmmIBD), we are going to have to do some data munging.
 <br>
 _**Coding Question 8, part 1**_: Make a within-sample alternative allele frequency (WSAF) matrix. First, start by extracting the alternative allele, or the number of alternative reads, at a particular locus per sample using the `vcfR::extract.gt(vcf, element = "AD")` function: (the numerator). Next, calculate the total allele depth per locus, per sample using the `vcfR::extract.gt(vcf, element = "DP")` function: (the denominator). Now, find the WSAF by dividing the numerator by the denominator and name this new matrix `wsaf`. 
@@ -503,7 +502,7 @@ readr::write_tsv(afmat, file = "data/af_matrix_for_hmmIBD.txt", col_names = F)
 `r hrule()`
 <br> 
 
-Explore the [hmmIBD documentation](https://github.com/glipsnort/hmmIBD) for a justification of this munging that we did above and further clarfication of the caveat below. 
+Explore the [hmmIBD documentation](https://github.com/glipsnort/hmmIBD) for a justification of this munging that we did above and further clarification of the caveat below. 
 
 _**Caveat**: The `hmmIBD` algorithm assumes that all samples are monoclonal. As a result, it does not accept heterozygote calls natively. As a user, we have two options: (1) to set those heterozygote calls to missing (a conservative approach), or (2) make a strong assumption about what a heterozygote call means (an aggressive approach). Here, I have forced the samples to be monoclonal by estimating their within-sample allele frequencies and rounding to the nearest variant._
 
@@ -511,7 +510,7 @@ _**Caveat**: The `hmmIBD` algorithm assumes that all samples are monoclonal. As 
 <br>
 <br>
 
-##### Running hmmIBD 
+##### Running hmmIBD {.unnumbered}
 Now we will run the `hmmIBD` program to calculate pairwise IBD. For convenience, copy and paste the code below into your console to acquire these results. 
 
 ```{r}
@@ -556,7 +555,7 @@ ibd_hmm_long %>%
 
 _**Conceptual Question 6:** Describe the HMM distribution. Is this what you expected?_
 `r begin_button(106)`
-_**Conceptual Answer 6:**_ The distribution is centered over approximatley 0-0.05, suggesting that most pairs have very little IBD. THis suggests lower levels of relatedness than demonstrated in the MLE distribution above. Again, there are a few pairs with high levels of IBD. 
+_**Conceptual Answer 6:**_ The distribution is centered over approximately 0-0.05, suggesting that most pairs have very little IBD. This suggests lower levels of relatedness than demonstrated in the MLE distribution above. Again, there are a few pairs with high levels of IBD. 
 `r end_button()`
 `r hrule()`
 <br> 
@@ -643,7 +642,7 @@ In this section, we will focus on the utility of IBD for realistic applications 
 ## IBD Distribution
 First, let's look at the distribution of our IBD estimates. In particular, we will focus in on the "tail" of the distribution (_i.e._ high values). Plotting the IBD distributions help to convey how interbred our population is, and if we expect there to be highly related pairs that are of importance for revealing corridors of gene flow (assessed later).
 <br>
-_**Coding Question 14**_: Use the `geom_histogram` ggplot layer to reate a plot that shows the distribution of MLE IBD estimations. We will add an inset plot to explore the tail of this distribution. Explore this [blog](https://meghan.rbind.io/blog/cowplot/) to learn how to make plots with insets using the `cowplot` package. 
+_**Coding Question 14**_: Use the `geom_histogram` ggplot layer to create a plot that shows the distribution of MLE IBD estimations. We will add an inset plot to explore the tail of this distribution. Explore this [blog](https://meghan.rbind.io/blog/cowplot/) to learn how to make plots with insets using the `cowplot` package. 
 `r begin_button(14)`
 ```{r}
 mainplot <- ibd_mle_long %>%
@@ -690,7 +689,7 @@ As we have seen from the recombination review at the beginning of the practical,
 By grouping samples together by their home demes, we can estimate the amount of inbreeding within a deme, or the within-deme IBD. Here, we will read in the `data/metadata.RDS` file and calculate the mean IBD by deme to get the within-deme IBD. We will then plot the within-deme IBD versus simulated mean COI.  
 <br>  
 <br>
-_**Coding Question 15, part 1**_: Read in the metadata using the following code: `readRDS("data/metadata.RDS")`. Then combine our metadata to the `ibd_mle_long` dataframe using two different `left_join` calls. Note, you will need to make two different "metadata" dataframe with a column named "p1" (sample 1) and one wth a column named "p2" (sample 2). Rename the ".x" and ".y" extensions created by `left_join` to "_p1" and "_p2", respectively. 
+_**Coding Question 15, part 1**_: Read in the metadata using the following code: `readRDS("data/metadata.RDS")`. Then combine our metadata to the `ibd_mle_long` dataframe using two different `left_join` calls. Note, you will need to make two different "metadata" dataframe with a column named "p1" (sample 1) and one with a column named "p2" (sample 2). Rename the ".x" and ".y" extensions created by `left_join` to "_p1" and "_p2", respectively. 
 After joining this data together, you should have a new dataframe with column names: `p1, p2, malectof, deme_p1, coimeans_p1, longnum_p1, latnum_p1, deme_p2, coimeans_pe2, longnum_p2, latnum_p2`. We are going to use this dataframe for the next few challenges, so please name it `ibd_mle_long_mtdt`.
 <br>
 `r begin_button(15)`
@@ -763,7 +762,7 @@ _**Conceptual Answer 12:**_ Our expectations do not always match realized data. 
 Next, we will explore the concept of isolation by distance, which is the theory that as pairs move further away in space, they should be less related (_i.e._ closer pairs are more likely to reproduce). This concept is based on spatial relationships, but can also be conceptualized as time (pairs that are separated by multiple generations of time are less likely to be related).
 
 
-_**Coding Question 17, part 1**_: Calculate [greater circle distance](https://en.wikipedia.org/wiki/Great-circle_distance). First, we will read in our pre-calculated GC distances: `readRDS(data/deme_gc_dist.RDS)`. Use a `left_join` call to merge this data while making a new dataframe called `ibd_mle_long_mtdt_dist`. Now, we will "bin" our distances by converting this continuous value into a discretized form using the `cut` function:   
+_**Coding Question 17, part 1**_: Calculate [greater circle distance](https://en.wikipedia.org/wiki/Great-circle_distance). First, we will read in our pre-calculated GC distances: `readRDS(data/deme_gc_dist.RDS)`. Use a `left_join` call to merge this data while making a new dataframe called `ibd_mle_long_mtdt_dist`. Now, we will "bin" our distances by converting this continuous value into a discrete form using the `cut` function:   
 ```
 cut(x = c(ibd_mle_long_mtdt_dist$distance),
 breaks = c(0, 1e-26, seq(40, 120, by = 40), Inf),
@@ -849,7 +848,7 @@ We can also use networks to determine the connectivity of our paired samples. Ne
 <br>
 Read this STDHA [blog](http://sthda.com/english/articles/33-social-network-analysis/136-network-analysis-and-manipulation-using-r) networks and on community detection algorithms and use the R packages: [tidygraph](https://tidygraph.data-imaginist.com/index.html) and [ggraph](https://ggraph.data-imaginist.com/) to try to generate the figure below. 
 
-_**Coding Question 20**_: Use the `tidygraph::as_tbl_graph` function to convert our`ibd_mle_long` into an a `tbl_graph` for easier network analyses. Then calculate the compunity membership using `tidygraph::group_louvain(weights = malecotf)))` function and plot the resulting network with `ggraph::ggraph(layout = 'kk')`. Make sure to color in the nodes by community using the `geom_node_point` layer and proper aesthetic: `ggraph::geom_node_point(aes(color = community)`. 
+_**Coding Question 20**_: Use the `tidygraph::as_tbl_graph` function to convert our`ibd_mle_long` into an a `tbl_graph` for easier network analyses. Then calculate the community membership using `tidygraph::group_louvain(weights = malecotf)))` function and plot the resulting network with `ggraph::ggraph(layout = 'kk')`. Make sure to color in the nodes by community using the `geom_node_point` layer and proper aesthetic: `ggraph::geom_node_point(aes(color = community)`. 
 
 `r begin_button(20)`
 ```{r}
@@ -1003,16 +1002,16 @@ ggplot() +
 _**Conceptual Question 15:** What can highly related pairs tell you? How do they relate to transmission events? Can you use them to estimate genetic corridors or evidence of gene flow? Do you think there is active transmission between the mainland and island (see original study hypothesis)?_
 <br>
 `r begin_button(115)`
-_**Conceptual Answer 15:**_ Highly related pairs provide evidence of very recent transmission events. For example, meiotic siblings (IBD $geq$ 0.5) are expected to only be separated by a single generation (under certain assumptions: infinite population size, random breeding, etc). As a result, highly related pairs provide strong evidence of active corridors of gene flow. Thus, there is evidence that there is active transmission between the main and island! Further epidemiologic data would be needed to confirm our new suspicion that the mainland is the "source" that is seeding the island ("sink").  
+_**Conceptual Answer 15:**_ Highly related pairs provide evidence of very recent transmission events. For example, meiotic siblings (IBD $geq$ 0.5) are expected to only be separated by a single generation (under certain assumptions: infinite population size, random breeding, etc). As a result, highly related pairs provide strong evidence of active corridors of gene flow. Thus, there is evidence that there is active transmission between the main and island! Further epidemiological data would be needed to confirm our new suspicion that the mainland is the "source" that is seeding the island ("sink").  
 `r end_button()`
 `r hrule()`
 <br> 
 
 
-# Addendum {-}
+# Addendum {.unnumbered}
 Congratulations, you have reached the end of the practical. This section contains advanced material and additional resources for interested participants. If time permits, you can explore the advanced material challenge, the challenge questions, and/or the further readings. 
 
-### Coding Challenges 
+### Coding Challenges {.unnumbered}
 In this section, you will have the opportunity to explore and practice the skills above. 
 <br>
 Imagine that there are two populations: _A_ and _B_ with similar levels of falciparum incidence. However, there are only enough public health funds to intervene on one population. You have been asked by your National Malaria Control Programme (NMCP) to determine which population to intervene on. You first conduct a "travel survey" and determine that there are a high number of people that travel from _A_ to _B_. As a result, you hypothesis that _A_ is a "source" for _B_. Using the _VCF_ below, create a series of figure that you would present to your NMCP to encourage them to interview on population _A_ instead of _B_. Make sure to calculate IBD with multiple approaches to confirm your results. 
@@ -1027,7 +1026,7 @@ When finished with your figures, please ask an instructor for feedback.
 
 
 
-## IBD & Polyclonality
+## IBD & Polyclonality {.unnumbered}
 As was described in the case of `hmmIBD`, polyclonality greatly complicates IBD estimates and is an active area of research. Recent solutions include considering the malaria genome as diploid, which allows for heterozygous alleles: [`isoRelate`](https://github.com/bahlolab/isoRelate) or phasing polyclonal infections and estimating IBD from the resultant haplotypes: [deploidIBD](https://github.com/DEploid-dev/DEploid). This is an active area of research and remains a challenge within the malaria genomic epidemiology field. <br>
 Below is a table of pros-cons-details of various IBD programs specified for malaria that have been peer-reviewed as of August 5, 2022. 
 <br>
@@ -1037,7 +1036,7 @@ Below is a table of pros-cons-details of various IBD programs specified for mala
 | **Program** 	| **Pros** 	| **Cons** 	| **Details** 	|
 |---	|---	|---	|---	|
 | [Inbreeding estimation](https://pubmed.ncbi.nlm.nih.gov/32355199/) 	| + Fast 	| + Assumes independent loci 	|  Model is not considering recombination blocks (backbone of IBD) 	|
-| [hmmIBD](https://github.com/glipsnort/hmmIBD) 	| + Fast <br><br>+ Easy to use <br><br>+ Statistically robust <br><br>+ Cannonical program for malaria ibd <br> 	| + Specified for monoclonals 	|  Users can use in polyclonal samples, but is misspecified under model and results are typically conservative estimates of IBD 	|
+| [hmmIBD](https://github.com/glipsnort/hmmIBD) 	| + Fast <br><br>+ Easy to use <br><br>+ Statistically robust <br><br>+ Canonical program for malaria ibd <br> 	| + Specified for monoclonals 	|  Users can use in polyclonal samples, but is misspecified under model and results are typically conservative estimates of IBD 	|
 | [isoRelate](https://github.com/bahlolab/isoRelate) 	| + Statistically robust <br><br>+ Handles polyclonals <br><br>+ Statistical testing for "important" loci <br> 	| + Can become computationally intensive  	|  Model assumes a "diploid" state for COI > 1, and thus makes a simplifying assumption about polyclonality 	|
 | [DeploidIBD](https://github.com/DEploid-dev/DEploid) 	| + Statistically robust <br><br>+ Handles polyclonals <br><br>+ Phased sample results <br><br>+ Within-sample estimates of IBD <br> 	| + Computationally intensive 	| Model phases polyclonal samples into monoclonal samples (_i.e._ a sample with COI = 2 becomes two new phased strains: smpl1.1, smpl1.2). As part of phasing, program provides within-sample IBD. From phased sample results, users can use any existing IBD program (`hmmIBD`, `refinedIBD`, etc). Program's primary goal is phasing with within-IBD estimates provided as a "bonus". 	|
 
@@ -1045,14 +1044,14 @@ Below is a table of pros-cons-details of various IBD programs specified for mala
 <br>
 
 
-### Further Reading 
-#### HMMs
+### Further Reading {.unnumbered}
+#### HMMs {.unnumbered}
 
 Hidden Markov models (HMMs) are a common statistical approach in population genetics, and for detecting IBD. For further reading, see [Rabiner 1989](https://web.mit.edu/6.435/www/Rabiner89.pdf).  
 <br>
 <br>
 
-#### Coalescent Theory
+#### Coalescent Theory {.unnumbered}
 
 Coalescent theory is one of the central pillars of population genetics and provides a framework for how loci (genes, individuals, etc.) have been derived from a common ancestor backwards in time, classically using the assumptions of the Wright-Fisher model. 
 <br>
