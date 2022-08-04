@@ -8,3 +8,4 @@ IBD/instructors/images/*.pptx
 # R files
 .Rproj.user
 .Rhistory
+.RData
