@@ -27,7 +27,7 @@ knitr::opts_chunk$set(echo = T, warning = F, message = F,
 Please copy and paste the below code chunk in it's entirety to your console to download R package libraries needed for this practical. If you are having trouble installing any of the R packages, please ask an instructor for a pre-loaded flash drive.
 
 ```{r, class.source = "fold-show"}
-deps <- c("tidyverse", "vcfR", "MIPanalyzer", "hmmibdr", "sf", "tidygraph", "ggraph")
+deps <- c("tidyverse", "vcfR", "MIPanalyzer", "hmmibdr", "sf", "cowplot", "tidygraph", "ggraph")
 deps <- !sapply(deps, function(x){x %in% installed.packages()[,1]} )
 if(any(deps)) {
   if(deps["hmmibdr"]) {
@@ -68,14 +68,6 @@ source("R/utils.R")
 ```
 
 # Introduction {.unnumbered}
-## Useful Definitions {.unnumbered}
-_**Definition:** An allele is the state of a particular genetic locus or sequence that is inherited between parents and offspring._ <br>
-_**Definition:** A locus is a fixed position on a chromosome where a particular genetic marker is located._ <br>
-_**Definition:** Sequencing data consists of sequences of DNA obtained from a DNA sequencing reaction_ <br>
-_**Definition:** Complexity of infection, or multiplicity of infection, is a measure of the number of different malaria parasite clones in an individual sample._ <br>
-_**Definition:** A monoclonal malaria infection contains one parasite strain, or "genome" (complexity of infection [COI] = 1), while a polyclonal infection contains more than one parasite strain (COI > 1)._ <br>
-_**Definition:** A deme is a local population that has individuals that interbreed and share genetic material._ <br>
-<br>
 <br>
 
 ## Relatedness Overview {.unnumbered}
@@ -118,10 +110,8 @@ _\*As discussed yesterday, COI is a poor measure of incidence in the real world.
 By the end of this practical, you should able to perform the below tasks and understand the following concepts:     
 + Calculate IBS    
 + Calculate IBD    
-+ IBS is straightforward to calculate but can produce biased estimates of relatedness (*i.e.* does not necessarily reflect ancestry and is affected by population level allele frequencies)      
-+ IBD captures recent relatedness, useful for determining transmission events, transmission intensity, importation, and corridors of gene flow       
-- Therefore, IBS/IBD can measure connectivity on spatial-temporal scales relevant to malaria control and elimination efforts          
-+ IBD should decay with distance (isolation by distance) and time; when it does not, interesting things may be happening    
++ Understand strengths and weaknesses of IBS 
++ Understand strengths and weaknesses of IBD       
 
 ---------------------------------------------------------------------
 
@@ -572,7 +562,7 @@ _**Conceptual Answer 6:**_ The distribution is centered over approximatley 0-0.0
 <br> 
 <br>
 
-#### Contrast MLE vs HMM
+#### Contrast MLE vs HMM {.unnumbered}
 As described above, the IBD calculations from the MLE model assume independent loci, while the HMM model leverages recombination to detect relatedness. However, `hmmIBD` requires monoclonal infections and we had to "coerce" our data to fit that assumption. Here, we will explore how the MLE IBD and the HMM IBD results differ. 
 
 <br>
@@ -608,10 +598,10 @@ _**Conceptual Answer 7:**_ Remember that `hmmIBD` assumes that samples are monoc
 <br> 
 <br>
 
-#### Contrast IBS vs HMM-IBD
+#### Contrast IBS vs HMM-IBD {.unnumbered}
 Compare IBS and the `hmmIBD` results in a scatterplot.  
-_**Coding Question 12**_: Using the `geom_point` ggplot layer, create a plot that contrast the IBS estimations and the MLE IBD estimations. Add a regression line to explore the correlation using the `geom_smooth(aes(x = malecotf, y = ibsdist), method = "lm")` layer. Note, you will need to join the data by sample using the following function: `left_join(ibs_long, ibd_mle_long, by = c("p1", "p2"))` prior to using ggplot.
-`r begin_button(12)`
+_**Coding Question 13**_: Using the `geom_point` ggplot layer, create a plot that contrast the IBS estimations and the MLE IBD estimations. Add a regression line to explore the correlation using the `geom_smooth(aes(x = malecotf, y = ibsdist), method = "lm")` layer. Note, you will need to join the data by sample using the following function: `left_join(ibs_long, ibd_mle_long, by = c("p1", "p2"))` prior to using ggplot.
+`r begin_button(13)`
 ```{r}
 dplyr::left_join(ibs_long, ibd_hmm_long, by = c("p1", "p2")) %>%
   ggplot() +
@@ -653,8 +643,8 @@ In this section, we will focus on the utility of IBD for realistic applications 
 ## IBD Distribution
 First, let's look at the distribution of our IBD estimates. In particular, we will focus in on the "tail" of the distribution (_i.e._ high values). Plotting the IBD distributions help to convey how interbred our population is, and if we expect there to be highly related pairs that are of importance for revealing corridors of gene flow (assessed later).
 <br>
-_**Coding Question 13**_: Use the `geom_histogram` ggplot layer to reate a plot that shows the distribution of MLE IBD estimations. We will add an inset plot to explore the tail of this distribution. Explore this [blog](https://meghan.rbind.io/blog/cowplot/) to learn how to make plots with insets using the `cowplot` package. 
-`r begin_button(13)`
+_**Coding Question 14**_: Use the `geom_histogram` ggplot layer to reate a plot that shows the distribution of MLE IBD estimations. We will add an inset plot to explore the tail of this distribution. Explore this [blog](https://meghan.rbind.io/blog/cowplot/) to learn how to make plots with insets using the `cowplot` package. 
+`r begin_button(14)`
 ```{r}
 mainplot <- ibd_mle_long %>%
   ggplot() +
@@ -700,10 +690,10 @@ As we have seen from the recombination review at the beginning of the practical,
 By grouping samples together by their home demes, we can estimate the amount of inbreeding within a deme, or the within-deme IBD. Here, we will read in the `data/metadata.RDS` file and calculate the mean IBD by deme to get the within-deme IBD. We will then plot the within-deme IBD versus simulated mean COI.  
 <br>  
 <br>
-_**Coding Question 13, part 1**_: Read in the metadata using the following code: `readRDS("data/metadata.RDS")`. Then combine our metadata to the `ibd_mle_long` dataframe using two different `left_join` calls. Note, you will need to make two different "metadata" dataframe with a column named "p1" (sample 1) and one wth a column named "p2" (sample 2). Rename the ".x" and ".y" extensions created by `left_join` to "_p1" and "_p2", respectively. 
+_**Coding Question 15, part 1**_: Read in the metadata using the following code: `readRDS("data/metadata.RDS")`. Then combine our metadata to the `ibd_mle_long` dataframe using two different `left_join` calls. Note, you will need to make two different "metadata" dataframe with a column named "p1" (sample 1) and one wth a column named "p2" (sample 2). Rename the ".x" and ".y" extensions created by `left_join` to "_p1" and "_p2", respectively. 
 After joining this data together, you should have a new dataframe with column names: `p1, p2, malectof, deme_p1, coimeans_p1, longnum_p1, latnum_p1, deme_p2, coimeans_pe2, longnum_p2, latnum_p2`. We are going to use this dataframe for the next few challenges, so please name it `ibd_mle_long_mtdt`.
 <br>
-`r begin_button(13)`
+`r begin_button(15)`
 ```{r}
 #......................
 # part 1
@@ -731,8 +721,8 @@ _**Conceptual Answer 10:**_ We have a tidy long dataframe that contains pairwise
 <br> 
 <br>  
 
-_**Code Question 14, part 2**_: Calculate within-deme IBD. Now, subset your dataframe to only contain rows where pairwise comparisons are from the same deme: `dplyr::filter(deme_p1 == deme_p2)`. Group by demes (`group_by(deme_p1)`) and use the `summarise` function to calculate the mean within-deme IBD and the mean COI (note, COI is the same within a deme). Then use the `geom_point` layer in ggplot to contrast COI and within-deme IBD calculations. 
-`r begin_button(14)`
+_**Code Question 16, part 2**_: Calculate within-deme IBD. Now, subset your dataframe to only contain rows where pairwise comparisons are from the same deme: `dplyr::filter(deme_p1 == deme_p2)`. Group by demes (`group_by(deme_p1)`) and use the `summarise` function to calculate the mean within-deme IBD and the mean COI (note, COI is the same within a deme). Then use the `geom_point` layer in ggplot to contrast COI and within-deme IBD calculations. 
+`r begin_button(16)`
 ```{r}
 #......................
 # part 2: plot within IBD
@@ -773,7 +763,7 @@ _**Conceptual Answer 12:**_ Our expectations do not always match realized data. 
 Next, we will explore the concept of isolation by distance, which is the theory that as pairs move further away in space, they should be less related (_i.e._ closer pairs are more likely to reproduce). This concept is based on spatial relationships, but can also be conceptualized as time (pairs that are separated by multiple generations of time are less likely to be related).
 
 
-_**Coding Question 15, part 1**_: Calculate [greater circle distance](https://en.wikipedia.org/wiki/Great-circle_distance). First, we will read in our pre-calculated GC distances: `readRDS(data/deme_gc_dist.RDS)`. Use a `left_join` call to merge this data while making a new dataframe called `ibd_mle_long_mtdt_dist`. Now, we will "bin" our distances by converting this continuous value into a discretized form using the `cut` function:   
+_**Coding Question 17, part 1**_: Calculate [greater circle distance](https://en.wikipedia.org/wiki/Great-circle_distance). First, we will read in our pre-calculated GC distances: `readRDS(data/deme_gc_dist.RDS)`. Use a `left_join` call to merge this data while making a new dataframe called `ibd_mle_long_mtdt_dist`. Now, we will "bin" our distances by converting this continuous value into a discretized form using the `cut` function:   
 ```
 cut(x = c(ibd_mle_long_mtdt_dist$distance),
 breaks = c(0, 1e-26, seq(40, 120, by = 40), Inf),
@@ -782,7 +772,7 @@ labels = c("Within", "40km", "80km", "120km", ">120km"))
 ```
 <br>
 
-`r begin_button(15)`
+`r begin_button(17)`
 ```{r}
 
 #......................
@@ -802,8 +792,8 @@ ibd_mle_long_mtdt_dist$distance_cat <-
 `r hrule()`
 <br> 
 
-_**Coding Question 16, part 2**_: Using our newly created dataframe, `ibd_mle_long_mtdt_dist`, group by the `distance_cat` column created with the `cut` function above and calculate the following summaries (`summarise`): mean IBD, standard deviation IBD, standard error IBD, lower 95% CI for IBD, and upper 95% CI for IBD. You can review the power practical, part 1 for a refresher on these statistics.   
-`r begin_button(16)`
+_**Coding Question 18, part 2**_: Using our newly created dataframe, `ibd_mle_long_mtdt_dist`, group by the `distance_cat` column created with the `cut` function above and calculate the following summaries (`summarise`): mean IBD, standard deviation IBD, standard error IBD, lower 95% CI for IBD, and upper 95% CI for IBD. You can review the power practical, part 1 for a refresher on these statistics.   
+`r begin_button(18)`
 ```{r}
 #......................
 # part 2
@@ -823,9 +813,9 @@ plotdat <- ibd_mle_long_mtdt_dist %>%
 <br> 
 
 
-_**Coding Question 17, part 3**_: Using the `geom_pointrange` layer in ggplot, plot the mean IBD on the y-axis and the categorized GC distance on the x-axis. For the `geom_pointrange` aesthetics, you will need to specify: `y = meanIBD, ymin = L95CI, ymax = U95CI`. 
+_**Coding Question 19, part 3**_: Using the `geom_pointrange` layer in ggplot, plot the mean IBD on the y-axis and the categorized GC distance on the x-axis. For the `geom_pointrange` aesthetics, you will need to specify: `y = meanIBD, ymin = L95CI, ymax = U95CI`. 
 
-`r begin_button(17)`
+`r begin_button(19)`
 ```{r}
 
 #......................
@@ -859,9 +849,9 @@ We can also use networks to determine the connectivity of our paired samples. Ne
 <br>
 Read this STDHA [blog](http://sthda.com/english/articles/33-social-network-analysis/136-network-analysis-and-manipulation-using-r) networks and on community detection algorithms and use the R packages: [tidygraph](https://tidygraph.data-imaginist.com/index.html) and [ggraph](https://ggraph.data-imaginist.com/) to try to generate the figure below. 
 
-_**Coding Question 18**_: Use the `tidygraph::as_tbl_graph` function to convert our`ibd_mle_long` into an a `tbl_graph` for easier network analyses. Then calculate the compunity membership using `tidygraph::group_louvain(weights = malecotf)))` function and plot the resulting network with `ggraph::ggraph(layout = 'kk')`. Make sure to color in the nodes by community using the `geom_node_point` layer and proper aesthetic: `ggraph::geom_node_point(aes(color = community)`. 
+_**Coding Question 20**_: Use the `tidygraph::as_tbl_graph` function to convert our`ibd_mle_long` into an a `tbl_graph` for easier network analyses. Then calculate the compunity membership using `tidygraph::group_louvain(weights = malecotf)))` function and plot the resulting network with `ggraph::ggraph(layout = 'kk')`. Make sure to color in the nodes by community using the `geom_node_point` layer and proper aesthetic: `ggraph::geom_node_point(aes(color = community)`. 
 
-`r begin_button(18)`
+`r begin_button(20)`
 ```{r}
 adj_graph <- ibd_mle_long %>%
   tidygraph::as_tbl_graph(., directed = F)
@@ -887,8 +877,8 @@ ibd_mle_long %>%
 `r hrule()`
 <br> 
 
-_**Coding Question 19**_: While that graph is interesting, it may be hard to interpret given all of the low-level relatedness connections. Let's prune those and keep only connections with IBD $\geq$ 0.1. Use the `dplyr::filter` function to perform this task. 
-`r begin_button(19)`
+_**Coding Question 21**_: While that graph is interesting, it may be hard to interpret given all of the low-level relatedness connections. Let's prune those and keep only connections with IBD $\geq$ 0.1. Use the `dplyr::filter` function to perform this task. 
+`r begin_button(21)`
 ```{r}
 
 ibd_mle_long %>%
@@ -959,9 +949,9 @@ ggplot() +
 ```
 
 
-_**Coding Question 20, part 1**_: Here we will set up our data for making the map/plot. Read in the simulated map with the following function: `readRDS("data/sim_map_sf.RDS")`. Then make a condensed version of the metadata that just contains one row of coordinates for each deme. Next, make a dataframe containing highly related pairs between demes by subsetting the `ibd_mle_long_mtdt` to at least meiotic siblings: `dplyr::filter(malecotf >= 0.25)` and by excluding pairs that are from the same deme: ` dplyr::filter(deme_p1 != deme_p2)`. Finally, create a dataframe of demes that contain highly related pairs by subsetting the `ibd_mle_long_mtdt` to at least meiotic siblings: `dplyr::filter(malecotf >= 0.25)` and by including only pairs that are from the same deme: ` dplyr::filter(deme_p1 == deme_p2)`. You know have four objects ready for plotting: (1) map, (2) cluster locations, (3) highly related between deme pairs, (4) high related within deme pairs. 
+_**Coding Question 22, part 1**_: Here we will set up our data for making the map/plot. Read in the simulated map with the following function: `readRDS("data/sim_map_sf.RDS")`. Then make a condensed version of the metadata that just contains one row of coordinates for each deme. Next, make a dataframe containing highly related pairs between demes by subsetting the `ibd_mle_long_mtdt` to at least meiotic siblings: `dplyr::filter(malecotf >= 0.25)` and by excluding pairs that are from the same deme: ` dplyr::filter(deme_p1 != deme_p2)`. Finally, create a dataframe of demes that contain highly related pairs by subsetting the `ibd_mle_long_mtdt` to at least meiotic siblings: `dplyr::filter(malecotf >= 0.25)` and by including only pairs that are from the same deme: ` dplyr::filter(deme_p1 == deme_p2)`. You know have four objects ready for plotting: (1) map, (2) cluster locations, (3) highly related between deme pairs, (4) high related within deme pairs. 
 
-`r begin_button(20)`
+`r begin_button(22)`
 ```{r}
 #......................
 # part 1
@@ -986,9 +976,9 @@ withinpairs <- ibd_mle_long_mtdt %>%
 `r hrule()`
 <br> 
 
-_**Coding Question 21, part 2**_: We will now plot these dataframes. First make a map base using the `geom_sf` layer. Next add a layer for cluster locations using `geom_point(data = mtdtclst, aes(x = longnum, y = latnum)`. Now we will color in the demes that contain highly related pairs within: `geom_point(data = withinpairs, aes(x = longnum_p1, y = latnum_p1), color = "blue"`. Finally, we will add a connections between pairs across different demes from our highly related between pairs dataframe: `geom_curve(data = highbtwnpairs, aes(x = longnum_p1, y = latnum_p1, xend = longnum_p2, yend = latnum_p2, color = malecotf)`. Your plot contains both spatial and relatedness data in a easily communicated graph. Note, you can change the order of the layers in order to have either points or curves on top (remember, ggplot layers follow the order of the code). 
+_**Coding Question 23, part 2**_: We will now plot these dataframes. First make a map base using the `geom_sf` layer. Next add a layer for cluster locations using `geom_point(data = mtdtclst, aes(x = longnum, y = latnum)`. Now we will color in the demes that contain highly related pairs within: `geom_point(data = withinpairs, aes(x = longnum_p1, y = latnum_p1), color = "blue"`. Finally, we will add a connections between pairs across different demes from our highly related between pairs dataframe: `geom_curve(data = highbtwnpairs, aes(x = longnum_p1, y = latnum_p1, xend = longnum_p2, yend = latnum_p2, color = malecotf)`. Your plot contains both spatial and relatedness data in a easily communicated graph. Note, you can change the order of the layers in order to have either points or curves on top (remember, ggplot layers follow the order of the code). 
 
-`r begin_button(21)`
+`r begin_button(23)`
 ```{r}
 # make plot
 ggplot() +
@@ -1012,7 +1002,7 @@ ggplot() +
 <br>
 _**Conceptual Question 15:** What can highly related pairs tell you? How do they relate to transmission events? Can you use them to estimate genetic corridors or evidence of gene flow? Do you think there is active transmission between the mainland and island (see original study hypothesis)?_
 <br>
-`r begin_button(105)`
+`r begin_button(115)`
 _**Conceptual Answer 15:**_ Highly related pairs provide evidence of very recent transmission events. For example, meiotic siblings (IBD $geq$ 0.5) are expected to only be separated by a single generation (under certain assumptions: infinite population size, random breeding, etc). As a result, highly related pairs provide strong evidence of active corridors of gene flow. Thus, there is evidence that there is active transmission between the main and island! Further epidemiologic data would be needed to confirm our new suspicion that the mainland is the "source" that is seeding the island ("sink").  
 `r end_button()`
 `r hrule()`
