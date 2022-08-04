@@ -1,0 +1,31 @@
+---
+title: "Dependencies"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Dependencies for Workshop
+Software dependenices are defined as pieces of code or software that depend on one another. In our case, we will be using specific R-packages to help power the practicals. Some of these R-packages are availabe from [CRAN](https://cran.r-project.org/), a common R package repository, or [Github](https://github.com/), a common place for open-source code. Below you will find instructions on how to install these various dependencies. 
+
+## CRAN Packages
+Please copy and paste each line of code below into your console. *It is important to copy one line of code at a time.* If you run into problems downloading a specific package, please make a note of it and notify an instructor at an appropriate time. 
+```{r, eval = F}
+install.packages("tidyverse")
+install.packages("vcfR")
+install.packages("sf")
+install.packages("tidygraph")
+install.packages("ggraph")
+install.packages("cowplot")
+install.packages("remotes") # using this package below 
+```
+
+## Github Packages
+As above, please copy and paste each line of code below into your console. *Again, it is important to copy one line of code at a time.* If you run into problems downloading a specific package, please make a note of it and notify an instructor at an appropriate time. 
+```{r, eval = F}
+remotes::install_github("bobverity/rmaverick")
+remotes::install_github("OJWatson/hmmibdr")
+remotes::install_github("mrc-ide/MIPanalyzer")
+```
