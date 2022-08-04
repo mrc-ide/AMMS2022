@@ -1,5 +1,5 @@
 ---
-title: "AMMS Pratique : Résistance aux médicaments"
+title: "Activité AMMS Pratique : Résistance aux médicaments"
 author: "Andres Aranda-Diaz, Lucy Okell, Bob Verity"
 date: "`r Sys.Date()`"
 output: 
@@ -83,10 +83,10 @@ library(tidyverse)
 
 
 # Introduction à la résistance aux médicaments {-}
-La résistance aux médicaments est l'un des principaux cas d'utilisation de la surveillance moléculaire du paludisme. En quantifiant la fréquence des mutations connues pour conférer une résistance aux médicaments couramment utilisés, nous obtenons un système d'alerte précoce efficace qui peut être suivi d'études d'efficacité thérapeutique (TES) pour établir le risque d'échec clinique. Les données sur la résistance aux médicaments peuvent être assez simples, consistant en un numérateur et un dénominateur qui peuvent être utilisés pour estimer la prévalence, mais il existe également certaines complexités avec des combinaisons de mutations et d'haplotypes résistants aux médicaments que nous devons également explorer.
+La résistance aux médicaments est l'un des principaux cas d'utilisation de la surveillance moléculaire du paludisme. En quantifiant la fréquence des mutations connues pour conférer une résistance aux médicaments couramment utilisés, nous obtenons un système d'alerte précoce efficace qui peut être suivi d'études d'efficacité thérapeutique (TES) pour établir le risque d'échec clinique. Les données sur la résistance aux médicaments peuvent être assez simples, consistant d'un numérateur et un dénominateur qui peuvent être utilisés pour estimer la prévalence, mais il existe également certaines complexités avec des combinaisons de mutations et d'haplotypes résistants aux médicaments que nous devons également explorer.
 
 ### Aperçu des données {-}
-Dans cette pratique, nous utiliserons un ensemble de données du monde réel composé d'un grand ensemble de données de sonde d'inversion moléculaire (MIP) provenant de la RDC et des pays environnants, précédemment analysé par [Verity et al. 2020] (https://pubmed.ncbi.nlm.nih.gov/32355199/). Nous utiliserons une version simplifiée de cet ensemble de données en nous concentrant sur seulement trois mutations du gène *dhps*.
+Dans cette activité pratique, nous utiliserons un ensemble de données du monde réel composé d'un grand ensemble de données de sonde d'inversion moléculaire (MIP) provenant de la RDC et des pays environnants, précédemment analysé par [Verity et al. 2020] (https://pubmed.ncbi.nlm.nih.gov/32355199/). Nous utiliserons une version simplifiée de cet ensemble de données en nous concentrant sur seulement trois mutations du gène *dhps*.
 
 ### Objectifs pratiques {-}
 À la fin de cet exercice pratique, vous devriez être en mesure de :
@@ -104,9 +104,9 @@ Dans cette pratique, nous utiliserons un ensemble de données du monde réel com
 
 ## Aperçu des données {-}
 
-Les données génétiques peuvent être agrégées ou par échantillon. Les informations contenues dans un ensemble de données simple par échantillon doivent inclure un identifiant d'échantillon, des informations sur le locus (position ou un autre identifiant, séquence de référence et alternative) et l'abondance de séquences de référence et alternatives dans ce locus. Les métadonnées peuvent également être incluses. Pour les échantillons, nous souhaiterons peut-être savoir quand et où ils ont été collectés, ainsi que toute autre information pertinente. Pour les loci, nous pouvons vouloir connaître, par exemple, les séquences d'acides aminés pour lesquelles codent les codons.
+Les données génétiques peuvent être agrégées ou par échantillon. Les informations contenues dans un ensemble de données simple par échantillon doivent inclure un identifiant d'échantillon, des informations sur le locus (position ou un autre identifiant, séquence de référence et alternative) et l'abondance de séquences de référence et alternatives dans cette région du génome. Les métadonnées peuvent également être incluses. Pour les échantillons, nous souhaiterons peut-être savoir quand et où ils ont été collectés, ainsi que toute autre information pertinente. Pour ces régions du génome, nous pouvons vouloir connaître, par exemple, les séquences d'acides aminés pour lesquelles codent les codons.
 
-Dans ce TP, nous utiliserons un ensemble de données collectées en République Démocratique du Congo en 20?. Nous avons simplifié l'ensemble de données d'origine à des fins pédagogiques. Nous examinerons les mutations liées à la résistance dans le gène dhps.
+Dans ce TP, nous utiliserons un ensemble de données qui viennent de la République Démocratique du Congo en 2020. Nous avons simplifié l'ensemble de données originales pour plus faciliment completer l'exercise. Nous examinerons les mutations liées à la résistance dans le gène dhps.
 
 ## Se familiariser avec les données {-}
 Chargeons l'ensemble de données :
@@ -133,22 +133,22 @@ nrow(dr.data)
 `r hrule()`
 
 Nous pouvons voir que nous avons 13 colonnes et 1617 lignes. Les colonnes contiennent un identifiant d'échantillon (SAMPLE_ID) et des métadonnées d'échantillon (REGION), ainsi que des informations sur le lieu (le reste des colonnes).
-La dernière colonne est appelée REF_WSAF et décrit la proportion de séquences de référence dans un locus et un échantillon donnés.
+La dernière colonne est appelée REF_WSAF et décrit la proportion de séquences de référence dans une région du génome particulière et un échantillon donné.
 
-Jetons maintenant un coup d'œil à dr.data. Parce que dr.data a 1617 lignes, il est trop long à afficher, n'affichons que les 10 premières lignes.
+Jetons maintenant un coup d'œil à dr.data. Parce que dr.data a 1617 lignes, on ne peut pas l'afficher en entier alors, n'affichons que les 10 premières lignes.
 
 ```{r}
 dr.data[1:10,]
 ```
 
-Comme vous pouvez le constater, chaque échantillon comporte plusieurs lignes. Cela signifie probablement que nos données sont dans un format long, où les informations pour plusieurs lieux d'un échantillon sont contenues dans différentes lignes, au lieu de colonnes.
-En outre, certaines lignes affichent des valeurs NA dans REF_WSAF. Cela signifie que dans cet échantillon, il n'y a aucune information dans ce lieu.
+Comme vous pouvez le constater, chaque échantillon comporte plusieurs lignes. Cela signifie probablement que nos données sont dans un format long, où les informations pour un échantillon sont contenues dans différentes lignes, au lieu de plusieurs colonnes.
+En outre, certaines lignes affichent des valeurs NA dans REF_WSAF. Cela signifie que dans cet échantillon, il n'y a aucune information pour cette donnée.
 
 **Q2.** Pourquoi voudrions-nous stocker les données dans un format long ?
 
 `r begin_button(2)`
 
-**A2.** Le format long est utile lors du stockage de valeurs irrégulières ou manquantes, et est généralement considéré comme plus efficace. Un avantage majeur pour nos besoins est qu'il nous permet d'utiliser les fonctions `ggplot2`, qui attendent des données au format long en entrée.
+**A2.** Le format long est utile pour enregistrer des valeurs irrégulières ou manquantes, et est généralement considéré  plus efficace. Un avantage majeur pour nos besoins est qu'il nous permet d'utiliser les fonctions `ggplot2`, qui attendent des données au format long en entrée.
 
 `r end_button()`
 `r hrule()`
@@ -327,7 +327,7 @@ CI.UPPER <- PREVALENCE + 1.96 * sqrt(PREVALENCE * (1 - PREVALENCE) / N)
 c(PREVALENCE, CI.LOWER, CI.UPPER)
 ```
 
-**Q6.** Est-ce que votre réponse à la question "Quel codon a une prévalence plus élevée ?" changer maintenant que vous avez vu des intervalles confiants ?
+**Q6.** Est-ce que votre réponse à la question "Quel codon a une prévalence plus élevée ?" change maintenant que vous avez vu des intervalles de confiance ?
 
 `r begin_button(6)`
 
@@ -395,9 +395,9 @@ ggplot(data = dr.data.grouped.wald,
 
 # Visualiser les haplotypes {-}
 
-Comme nous en avons discuté dans la conférence, pour certains médicaments, la combinaison d'allèles (haplotypes) est l'information la plus pertinente. Ensuite, nous utiliserons un package, `UpSetR`, pour visualiser les combinaisons de mutations. La documentation sur le package peut être trouvée [ici](https://cran.r-project.org/web/packages/UpSetR/UpSetR.pdf ).
+Comme nous en avons discuté dans la lecture, pour certains médicaments, la combinaison d'allèles (haplotypes) est l'information la plus pertinente. Ensuite, nous utiliserons un package, `UpSetR`, pour visualiser les combinaisons de mutations. La documentation sur le package peut être trouvée [ici](https://cran.r-project.org/web/packages/UpSetR/UpSetR.pdf ).
 
-Les données polyclonales présentent un défi pour la construction d'haplotypes. Par exemple, si un échantillon contient 2 allèles à chacun des 2 loci, comment pouvons-nous savoir quel allèle va avec lequel dans chacun des parasites de cette infection ? Ce problème est appelé **phasage**, et nous travaillons souvent avec des données **non phasées**.
+Les données polyclonales présentent un défi pour la construction d'haplotypes. Par exemple, si un échantillon contient 2 allèles à chacun des 2 régions du génome, comment pouvons-nous savoir quel allèle va avec lequel dans chacun des parasites de cette infection ? Ce problème est appelé **phasage**, et nous travaillons souvent avec des données **non phasées**.
 
 Pour simplifier notre ensemble de données, nous supprimerons les échantillons avec "NAs" et ne considérerons que l'allèle le plus abondant dans chaque échantillon :
 
@@ -421,5 +421,5 @@ dr.data.simplified %>%
   summarize(n = n())
 ```
 
-Nous pouvons voir que certaines combinaisons d'haplotypes sont plus courantes que d'autres. Par exemple, le triple mutant est très courant, tout comme le double mutant 540+581.
+Nous pouvons voir que certaines combinaisons d'haplotypes sont plus communes que d'autres. Par exemple, le triple mutant est très commun, tout comme le double mutant 540+581.
 
