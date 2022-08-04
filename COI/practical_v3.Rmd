@@ -40,7 +40,7 @@ if(any(deps)) {
 ```
 
 ## Installing THEREALMcCOIL {.unnumbered}
-Install THEREALMcCOIL pacakge from the EPPIcenter GitHub:
+Install THEREALMcCOIL pacakge from the EPPIcenter GitHub (or use the pre-cloned repository: `AMMS/COI/THEREALMcCOIL/categorical_method`):
 
 1. In your terminal, navigate to the practical directory `cd AMMS2022/COI`
 2. Next, run `git clone https://github.com/EPPIcenter/THEREALMcCOIL.git`
@@ -370,7 +370,7 @@ VN_RMCLmat <- t(VN_RMCLmat)
 ```
 
 ## Running RMCL
-Now run the RMCL using the default settings provided in the [Github](https://github.com/EPPIcenter/THEREALMcCOIL/) for the DRC and VN. Note, you will need to create an outpute directory for results to send your output file to. 
+Now run the RMCL using the default settings provided in the [Github](https://github.com/EPPIcenter/THEREALMcCOIL/) for the DRC and VN. Note, you will need to create an output directory for results to send your output file to. 
 
 ```{r}
 # Prepare output directory
