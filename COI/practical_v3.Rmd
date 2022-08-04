@@ -373,10 +373,23 @@ VN_RMCL <- combined_RMCL[,c("loci", VNsmpls)]
 
 ```
 
-Now liftover values and into a matrix to conform with the RMCL expected input. 
+Now lift over values and into a matrix to conform with the RMCL expected input. 
+**Q&**: Complete the code chunk below (filling in *** with your own code) to convert the data into a RMCL format for VN using the DRC as an example.  
 
+```
+# DRC 
+DRC_RMCLmat <- as.matrix(DRC_RMCL[2:ncol(as.matrix(DRC_RMCL))])
+rownames(DRC_RMCLmat) <- DRC_RMCL[["loci"]]
+DRC_RMCLmat <- t(DRC_RMCLmat)
+# VN
+VN_RMCLmat <- as.matrix(***)
+rownames(VN_RMCLmat) <- VN_RMCL[[***]]
+VN_RMCLmat <- t(***)
+```
+
+`r begin_button(101)`
+**A&**: 
 ```{r}
-
 # make matrix and format for RMCL
 # DRC 
 DRC_RMCLmat <- as.matrix(DRC_RMCL[2:ncol(as.matrix(DRC_RMCL))])
@@ -386,11 +399,11 @@ DRC_RMCLmat <- t(DRC_RMCLmat)
 VN_RMCLmat <- as.matrix(VN_RMCL[2:ncol(as.matrix(VN_RMCL))])
 rownames(VN_RMCLmat) <- VN_RMCL[["loci"]]
 VN_RMCLmat <- t(VN_RMCLmat)
-
 ```
+`r end_button()`
 
 ## Running RMCL
-Now run the RMCL using the default settings provided in the [Github](https://github.com/EPPIcenter/THEREALMcCOIL/) for the DRC and VN. Note, you will need to create an output directory for results to send your output file to. 
+Now run the RMCL using the default settings provided in the [Github](https://github.com/EPPIcenter/THEREALMcCOIL/) for the DRC and VN. Note, you will need to create an output directory for results to send your output file to. For convenience, please copy and paste the code chunk below into your console. 
 
 ```{r}
 # Prepare output directory
@@ -439,6 +452,29 @@ If you see a message indicating the time it took to run RMCL... then you've succ
 ## Exploring RMCL outputs
 The outputs from THEREALMcCOIL are written to files in your specificed output directory. Let's load these files and explore our results.
 
+**Q&**: Complete the code chunk below (filling in *** with your own code) to filter your THEREALMcCOIL results to the relevant bits for VN using the DRC as an example. Then combine your results into one large dataframe.
+
+```
+# Load summary data for DRC
+DRCongo_COI <- read.table("results/output_DRC_COI_summary.txt", sep="\t", header=TRUE) %>% 
+  # Subset to COI results
+  dplyr::filter(CorP == "C") %>%  # subset to COI information
+  # select to rows we care about
+  dplyr::select(-c("file", "CorP")) %>% 
+  dplyr::rename(Indiv = name)
+DRCongo_COI$country <- "DRC"
+
+# load summary data for VN 
+VN_COI <- read.table("results/output_VN_COI_summary.txt", sep="\t", header=TRUE) %>% 
+  dplyr::filter(***) %>% 
+  dplyr::select(***) %>% 
+  dplyr::rename(Indiv = ***)
+VN_COI$country <- "VN"
+
+combined_COI <- dplyr::bind_rows(DRCongo_COI, ***)
+```
+`r begin_button(102)`
+**A&:**
 ```{r}
 
 # Load summary data for DRC
@@ -463,13 +499,26 @@ VN_COI$country <- "VN"
 combined_COI <- dplyr::bind_rows(DRCongo_COI, VN_COI)
 
 ```
+`r end_button()`
 <br>
 
-Let's visualise the COI distributions for DRC and VN:
+Let's visualise the COI distributions for DRC and VN by making a boxplot contrasting the two distributions. 
+**Q&**: Complete the code chunk below (filling in *** with your own code) to make a boxplot of your results.  
 
+```
+combined_COI %>% 
+  ggplot() +
+  geom_boxplot(***, outlier.shape = NA) +
+  geom_jitter(***, 
+              alpha = 0.3, size = 0.5, height=0.1) +
+  theme_linedraw() +
+  theme(legend.position = "none") + 
+  labs(y = "COI", x = "Country")
+```
 <br>
+`r begin_button(103)`
+**A&**
 ```{r}
-
 combined_COI %>% 
   ggplot() +
   geom_boxplot(aes(x = country, y = mean, color = country), outlier.shape = NA) +
@@ -480,23 +529,26 @@ combined_COI %>%
   labs(y = "COI", x = "Country")
 
 ```
+`r end_button()`
 
-**Q9:** Are there any differences in COI between the two countries? If so, can you explain them?
+**Q&:** Are there any differences in COI between the two countries? If so, can you explain them?
 
-`r begin_button(9)`
+`r begin_button(104)`
 
-**A9:** _Yes, the COI estimates are generally higher in DRC than in VN. This could be explained by differeces in transmission intensity between the two countries._
+**A&:** _Yes, the COI estimates are generally higher in DRC than in VN. This could be explained by differences in transmission intensity between the two countries._
 
 `r end_button()`
 
-**Q10:** Using `tidyverse` commands, compute the fraction of mixed infectios for each country.
+**Q&:** Using `tidyverse` commands: `group_by` and `summarise`, compute the fraction of mixed infectios for each country.
 
-`r begin_button(10)`
+`r begin_button(105)`
 
-**A10:**
+**A&:**
 
 ```{r}
-combined_COI %>% group_by(country) %>% summarise(frac_mixed=sum(mean>1)/n())
+combined_COI %>% 
+  group_by(country) %>% 
+  summarise(frac_mixed = sum(mean > 1)/n())
 ```
 
 `r end_button()`
@@ -519,6 +571,23 @@ First we will compute within-sample alternative allele frequencies (WSAF), which
 $$ WSAF = \frac{\mbox{Number of reads carrying alternative allele}}{\mbox{Total number of reads overlapping SNP}} $$
 We will add WSAF estimates as a column to the `combined_long` data frame produced above.
 
+**Q&:** Complete the code chunk below to calculate the WSAF per sample.
+
+```
+combined_long <- combined_long %>% 
+  dplyr::mutate(
+    rad = purrr::map_dbl(gt_AD, function(x){vcfR::masplit(
+      as.matrix(x), record = 1, sort = FALSE, decreasing = FALSE)}),
+    aad = purrr::map_dbl(gt_AD, function(x){vcfR::masplit(
+      as.matrix(x), record = 2, sort = FALSE, decreasing = FALSE)}),
+    wsaf = ***,
+    wsaf = ifelse(is.nan(wsaf), NA, wsaf) # occurs when 0/0
+  ) %>% 
+  dplyr::select(c("CHROM", "POS", "Indiv", "gt", "country", "wsaf")) 
+```
+
+`r begin_button(106)`
+**A&**
 ```{r}
 # extract GT information and get WSAF for every sample at each loci
 combined_long <- combined_long %>% 
@@ -536,7 +605,7 @@ combined_long <- combined_long %>%
   # now let's select the variables that we want
   dplyr::select(c("CHROM", "POS", "Indiv", "gt", "country", "wsaf")) 
 ```
-
+`r end_button()`
 
 ## Compute heterozygosity
 Now we will compute heterozygosities using our PLAF and WSAF values. First, we will implement the heterozygosity function above as an R function:
@@ -577,6 +646,19 @@ In this case, we have one value for each sample by each site.
 
 Now we will use our heterozygosity values to compute Fws!
 
+**Q&**: 
+
+```
+combined_long_fws <- dplyr::full_join(combined_long, plaf, by = c("CHROM", "POS", "country")) %>% 
+  dplyr::mutate(Fwsloci = het_wsaf / het_plaf) %>% 
+  dplyr::group_by(country, Indiv) %>% 
+  dplyr::summarise(
+    fws = mean( 1 - ***, na.rm = T)
+  )
+```
+<br>
+`r begin_button(107)`
+**A&**
 ```{r}
 
 # now calculate fws
@@ -588,7 +670,8 @@ combined_long_fws <- dplyr::full_join(combined_long, plaf, by = c("CHROM", "POS"
   )
 
 ```
-
+`r end_button()`
+<br>
 Finally, visualise your Fws values:
 
 ```{r}
@@ -596,14 +679,15 @@ combined_long_fws %>%
 ggplot() +
   geom_histogram(aes(x=fws, y = (..count../sum(..count..))*100),
                  color = "#000000", fill = "#d9d9d9") +
+  facet_wrap(~country) +
   xlab("Fws") + ylab("Frequency (%)") +
   theme_linedraw()
 
 ```
 
-**Q11:** Do the Fws conform to expectation? Explain.
+**Q&:** Do the Fws conform to expectation? Explain.
 
-`r begin_button(11)`
+`r begin_button(108)`
 
 **A11:** _Here, we see that DRC has *lower* Fws than VN. Again, this would be expected if transmission intensity were higher in the DRC._
 
@@ -623,11 +707,11 @@ combined_long_fws_COI <- dplyr::left_join(combined_long_fws,
 Finally, let's produce plots comparing these different parameters.
 
 #### COI vs. Fws
-```{r}
 
+```{r}
 # Plot
 combined_long_fws_COI %>% 
-  dplyr::mutate(meanfact = factor(mean, levels = 1:4)) %>% 
+  dplyr::mutate(meanfact = factor(mean, levels = 1:10)) %>% 
   ggplot() + 
   geom_boxplot(aes(x = meanfact, y = fws, 
                    group = meanfact, color = country)) + 
@@ -640,7 +724,24 @@ combined_long_fws_COI %>%
 
 
 #### COI vs. Number of heterozygous sites
-```{r}
+**Q&:** Using the code above, now make a boxplot for number of heterozygous sites versus complexity of infection. The resulting figure should resemble the plot below: 
+
+```{r, echo=F}
+combined_long_fws_COI %>% 
+  dplyr::mutate(meanfact = factor(mean, levels = 1:4)) %>% 
+  ggplot() + 
+  geom_boxplot(aes(x = meanfact, y = n_hets, 
+                   group = meanfact, color = country)) + 
+  facet_wrap(~country) + 
+  labs(x = "COI", y = "Number of Heterozygous Sites") +
+  theme_linedraw() +
+  theme(legend.position = "none") 
+```
+
+
+`r begin_button(109)`
+**A&**
+```{r, eval=F}
 
 # Plot
 combined_long_fws_COI %>% 
@@ -655,6 +756,7 @@ combined_long_fws_COI %>%
 
 
 ```
+`r end_button()`
 
 # Additional thinking questions
 ...
