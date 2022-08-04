@@ -1,0 +1,913 @@
+---
+title: "Pratique AMMS : Introduction à la puissance statistique" 
+author: "Bob Verity"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    theme: readable
+    highlight: tango
+    code_folding: show
+    toc: yes
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
+    number_sections: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F, 
+                      fig.align = 'center', fig.keep = 'all')
+```
+
+```{r, echo=FALSE}
+# utility functions and initialisation
+set.seed(1)
+
+#  ---------------------------------------
+# draw horizontal line using html
+hrule <- function() {
+  '<hr style="height:1px;border:none;color:#333;background-color:#333;">'
+}
+
+#  ---------------------------------------
+# functions for beginning and ending an expandable answer
+begin_button <- function(ID) {
+  sprintf('<p><a class="btn-sm btn-primary" data-toggle="collapse" href="#collapseExample%s" role="button" aria-expanded="false" aria-controls="collapseExample%s">Click For Answer</a></p><div class="collapse" id="collapseExample%s"><div class="card card-body">', ID, ID, ID)
+}
+end_button <- function(ID) {
+  '</div></div><br>'
+}
+```
+
+# Dépendances pour Pratique {-}
+
+Veuillez copier et coller le morceau de code ci-dessous dans son intégralité sur votre console pour télécharger les bibliothèques de packages R nécessaires à cette pratique. Si vous rencontrez des difficultés pour installer l'un des packages R, veuillez demander à un instructeur un lecteur flash préchargé.
+
+```{r, class.source = "fold-show"}
+if (!("tidyverse" %in% installed.packages())) {
+  install.packages("tidyverse")
+}
+```
+
+Chargez maintenant toutes ces bibliothèques dans cette session en utilisant le morceau de code ci-dessous. Veuillez le copier-coller dans son intégralité.
+
+```{r, class.source = "fold-show"}
+library(tidyverse)
+```
+
+Enfin, sourcez les fonctions supplémentaires nécessaires à ce TP en copiant-collant cette fonction:
+
+```{r, class.source = "fold-show"}
+source("source_functions/power1_utils.R")
+```
+
+# Introduction aux tests statistiques et à l'analyse de puissance {-}
+
+Très souvent en surveillance moléculaire nous sommes intéressés à répondre à des questions simples et bien définies, telles que :
+
+- La prévalence d'une mutation de résistance aux médicaments a-t-elle augmenté dans ma population au cours des 5 dernières années ?
+- L'utilisation des moustiquaires a-t-elle eu un impact sur la diversité génétique des parasites ?
+- L'incidence des résultats de TDR faussement négatifs est-elle plus élevée dans une population que dans une autre ?
+
+Nous pourrions simplement mesurer ces quantités et rapporter nos résultats, ce qui est parfois appelé **statistiques descriptives**, mais souvent nous voulons plus que cela. Nous voulons pouvoir "prouver" qu'un effet est réel. Cela signifie tenir compte du rôle du hasard dans nos résultats par le biais de **tests statistiques**, parfois appelés **tests d'hypothèse nulle**. S'il est très peu probable que nos résultats observés se produisent par hasard, cela nous donne plus de confiance qu'un effet est réel. Cela ne "prouve" pas tout à fait que l'effet est réel, car nous aurions toujours pu être très chanceux ou malchanceux, mais cela contrôle au moins la fréquence à laquelle nous arrivons à la mauvaise conclusion.
+
+Une fois que nous avons une bonne maîtrise des tests statistiques, la prochaine idée cruciale à saisir est la **puissance statistique**. Nous pouvons considérer l'**analyse de puissance** comme une sorte de test statistique que nous effectuons avant de voir des données. Au lieu de cela, nous faisons des hypothèses sur la force de l'effet dans le monde réel (par exemple, la différence de prévalence de la résistance aux médicaments) et la taille de notre échantillon, et nous calculons * exactement * la probabilité que nous ayons de détecter cet effet réel avec notre signification choisie test. Si la puissance est faible, nous risquons de manquer des résultats intéressants même s'ils sont là, car notre test statistique ne peut pas exclure la possibilité que nos résultats soient dus au pur hasard. Il est donc extrêmement important que nous effectuions une analyse de puissance avant d'entreprendre tout essai ou enquête sérieux pour nous assurer que nous avons une chance décente de succès.
+
+### Aperçu des données {-}
+
+Pour cette pratique, nous travaillerons entièrement avec des ensembles de données inventés ou simulés. Ceux-ci nous permettront de nous familiariser avec les concepts de base, que nous pourrons ensuite appliquer à des ensembles de données du monde réel à un stade ultérieur.
+
+### Objectifs pratiques {-}
+
+À la fin de cet exercice pratique, vous devriez être en mesure de :
+
+- Construire un intervalle de confiance à 95%
+- Réaliser un t-test pour comparer deux moyennes, et un z-test pour comparer deux proportions
+- Calculer la puissance statistique de plusieurs tests
+- Interpréter les courbes de puissance et calculer les tailles d'échantillon optimales
+- Ajuster la taille des échantillons pour l'abandon attendu
+- Commenter les questions d'études sous-alimentées et suralimentées
+- Concevoir une étude simple, en tenant compte de considérations statistiques et logistiques
+
+
+# Comparer les COI entre deux populations {-}
+
+## Tests statistiques {-}
+
+```{r, echo=FALSE, eval=FALSE}
+# code to generate the made-up COI data
+set.seed(1)
+COI_control <- rpois(10, lambda = 1.0) + 1
+COI_nets <- rpois(10, lambda = 0.5) + 1
+save(COI_control, file = "data/COI_control.RData")
+save(COI_nets, file = "data/COI_nets.RData")
+```
+
+Il vous a été demandé d'analyser certaines données sur la complexité de l'infection (COI) dans deux populations, dont l'une a connu une mise à l'échelle rapide des moustiquaires et l'autre agissant comme témoin. Le COI a tendance à être plus élevé dans les populations à forte intensité de transmission, donc l'hypothèse ici est que les moustiquaires auront provoqué une baisse du COI en moyenne par rapport à la population témoin.
+
+Chargeons les données COI et examinons rapidement la distribution:
+
+```{r, class.source = "fold-show", results='hold'}
+# load COI data
+load("data/COI_control.RData")
+load("data/COI_nets.RData")
+
+COI_control
+COI_nets
+```
+
+Nous pouvons voir que nous n'avons que 10 échantillons de chaque population, et il est difficile de dire en regardant si le COI est plus élevé dans une population ou dans l'autre.
+
+
+**Q1.** Quel est le COI moyen dans chaque population ? Quelle est la variance dans chaque population ? La moyenne est-elle supérieure ou inférieure dans la population disposant de moustiquaires ?
+
+`r begin_button(1)`
+
+**A1.** Moyennes et variances indiquées ci-dessous. La moyenne est légèrement supérieure dans le groupe témoin.
+
+```{r, results='hold', class.source = "fold-show"}
+# get mean and variance of control population
+mean(COI_control)
+var(COI_control)
+```
+
+```{r, results='hold', class.source = "fold-show"}
+# get mean and variance of bednets population
+mean(COI_nets)
+var(COI_nets)
+```
+`r end_button()`
+`r hrule()`
+
+Le COI moyen dans l'échantillon de contrôle est de 2,1. Il s'agit de notre meilleure *estimation* du COI moyen dans la *population* témoin, mais nous ne serions pas du tout surpris si la valeur de la population différait légèrement de 2,1. Par exemple, il se peut que le COI moyen dans la population soit de 2,0, et il se trouve que nous avons échantillonné par hasard des individus avec des COI légèrement plus élevés.
+
+Nous pouvons représenter notre incertitude dans l'estimation moyenne par l'*erreur standard*. La formule de l'erreur type est :
+
+$SE = \sqrt{\frac{s^2}{n}}$
+
+où $s^2$ est la variance de l'échantillon et $n$ est la taille de l'échantillon.
+
+
+**Q2.** Quelle est l'erreur type de la moyenne pour la population témoin ? Quelle est l'erreur type de la moyenne pour la population de moustiquaires ?
+
+`r begin_button(2)`
+
+**A2.** Nous pouvons calculer les erreurs standard à l'aide du code suivant :
+```{r, results='hold'}
+# get standard error of mean COI in the control population
+SE_control <- sqrt( var(COI_control) / 10 )
+SE_control
+
+# get standard error of mean COI in the bednets population
+SE_nets <- sqrt( var(COI_nets) / 10 )
+SE_nets
+```
+
+`r end_button()`
+`r hrule()`
+
+Nous pouvons utiliser l'erreur standard pour calculer un *intervalle de confiance à 95 %*. L'interprétation d'un intervalle de confiance sous une définition fréquentiste peut prêter à confusion. Il indique que si nous devions prélever des échantillons de la même population plusieurs fois (ou répéter cette "expérience" plusieurs fois), nous nous attendrions à ce que 95 % de nos intervalles de confiance calculés contiennent la moyenne de la population. Une interprétation plus directe est que nous sommes sûrs à _95 % que notre intervalle contient la moyenne de la population_. Les intervalles de confiance (IC) sont un moyen utile de visualiser l'incertitude dans une estimation. La formule pour un IC à 95 % (normal) est la suivante :
+
+$\bar{x} \pm 1,96 \times SE$
+
+où $\bar{x}$ est la moyenne de l'échantillon.
+
+
+**Q3.** Quel est l'IC à 95 % pour la population témoin ? Quel est l'IC à 95 % pour la population des moustiquaires ?
+
+`r begin_button(3)`
+
+**A3.** Nous pouvons calculer les IC en utilisant le code suivant :
+```{r, results='hold'}
+# calculate 95% CI for control population
+mean(COI_control) + c(-1.96, 1.96)*SE_control
+
+# calculate 95% CI for bednets population
+mean(COI_nets) + c(-1.96, 1.96)*SE_nets
+```
+
+`r end_button()`
+`r hrule()`
+
+
+**Q4.** Les IC des deux populations se chevauchent-ils ? Qu'est-ce que cela vous dit sur la confiance que nous accordons aux différences entre les moyennes ?
+
+`r begin_button(4)`
+
+**A4.** Oui, ils se chevauchent. Cela nous indique que nous ne sommes pas très confiants quant à une différence dans les moyennes, car la vraie moyenne dans la population des moustiquaires pourrait être la même ou même supérieure à celle de la population témoin.
+
+`r end_button()`
+`r hrule()`
+
+
+Nous comparerons les deux moyennes à l'aide du test t de Student à deux échantillons. Nous avons le même nombre d'échantillons dans les deux groupes, ce qui facilite un peu la vie, et nous supposerons également que les variances sont les mêmes entre les groupes.
+
+La formule de la statistique de test est la suivante :
+
+$t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\frac{\hat{s}^{2}_1 + \hat{s}^{2}_2}{ n}}}$
+
+où $\bar{x}_1$ et $\bar{x}_2$ sont les moyennes des deux groupes, $\hat{s}_1^2$ et $\hat{s}_2^2$ sont l'échantillon variances des deux groupes, et $n$ est la taille de l'échantillon (la même dans chaque groupe).
+
+**Q5.** Complétez la fonction ci-dessous pour calculer cette statistique de test à partir des données d'entrée :
+
+```{r}
+get_t_stat <- function(data_series1, data_series2) {
+  # calculate both means and variances and the sample size
+  
+  # calculate the test statistic
+  
+  # return the final value
+}
+```
+
+`r begin_button(5)`
+
+**A5.** Voici un exemple de la fonction terminée:
+```{r}
+get_t_stat <- function(data_series1, data_series2) {
+  # calculate both means and variances and the sample size
+  m1 <- mean(data_series1)
+  m2 <- mean(data_series2)
+  
+  v1 <- var(data_series1)
+  v2 <- var(data_series2)
+  
+  n <- length(data_series1)
+  
+  # calculate the test statistic
+  ret <- (m1 - m2) / sqrt((v1 + v2) / n)
+  
+  # return the final value
+  return(ret)
+}
+```
+
+`r end_button()`
+`r hrule()`
+
+
+**Q6.** Utilisez votre fonction complétée pour calculer la statistique du test t sur les données COI. Quelle valeur obtenez-vous ?
+
+`r begin_button(6)`
+
+**A6.** Nous obtenons la valeur suivante :
+
+```{r}
+get_t_stat(COI_control, COI_nets)
+```
+
+`r end_button()`
+`r hrule()`
+
+
+Rappelez-vous de la conférence que chaque statistique de test a une distribution connue sous l'hypothèse nulle. Dans ce cas, la distribution s'appelle la distribution t (ce qui est logique, c'est un test t après tout). Cette distribution a un paramètre "degrés de liberté", qui pour ce test est donné par la formule $2n-2$. Pour $n=10$, cela donne une valeur de 18. Le graphique suivant montre la distribution t avec 18 degrés de liberté, et avec notre valeur observée indiquée par une flèche :
+
+```{r, echo=FALSE, out.width="60%"}
+t_obs <- get_t_stat(COI_control, COI_nets)
+
+cv <- qt(c(0.025, 0.975), df = 18)
+df_lower_tail <- data.frame(x = seq(-5, cv[1], l = 101)) %>%
+  mutate(y = dt(x, df = 18)) %>%
+  bind_rows(data.frame(x = cv[1], y = 0))
+df_upper_tail <- data.frame(x = seq(5, cv[2], l = 101)) %>%
+  mutate(y = dt(x, df = 18)) %>%
+  bind_rows(data.frame(x = cv[2], y = 0))
+  
+data.frame(x <- seq(-5, 5, l = 201)) %>%
+  mutate(y = dt(x, df = 18)) %>%
+  ggplot() + theme_bw() +
+  geom_line(aes(x = x, y = y)) +
+  geom_polygon(aes(x = x, y = y), fill = "red", alpha = 0.5, data = df_lower_tail) +
+  geom_polygon(aes(x = x, y = y), fill = "red", alpha = 0.5, data = df_upper_tail) +
+  geom_segment(aes(x = t_obs, xend = t_obs, y = 0.5, yend = 0), arrow = arrow(length = unit(0.25, "cm"))) +
+  annotate("text", x = t_obs, y = 0.52, label = round(t_obs, 3)) +
+  xlab("t-statistic") + ylab("Probability")
+```
+
+**Q7.** Votre valeur observée de la statistique de test se situe-t-elle dans le corps de la distribution ou dans les queues ? Qu'est-ce que cela vous dit sur la probabilité que cette valeur soit sous l'hypothèse nulle d'aucune différence de COI entre les groupes ?
+
+`r begin_button(7)`
+
+**A7.** La valeur se trouve dans le corps de la distribution. Cela signifie que nous sommes assez susceptibles de voir une valeur aussi extrême que celle-ci si l'hypothèse nulle est vraie.
+
+`r end_button()`
+`r hrule()`
+
+
+Nous pouvons quantifier à quel point cette statistique de test est extrême en utilisant la valeur p.
+
+**Q8.** Complétez le code ci-dessous pour calculer une valeur de p:
+
+```{r, eval=FALSE}
+# define sample size and get t statistic
+n <- # TO COMPLETE
+t_stat <- # TO COMPLETE
+
+# calculate p-value
+2*pt(abs(t_stat), df = 2*n - 2, lower.tail = FALSE)
+```
+
+`r begin_button(8)`
+
+**A8.** Voici un exemple du code complété:
+```{r, eval=FALSE}
+# define sample size and get t statistic
+n <- 10
+t_stat <- get_t_stat(COI_control, COI_nets)
+
+# calculate p-value
+2*pt(abs(t_stat), df = 2*n - 2, lower.tail = FALSE)
+```
+
+`r end_button()`
+`r hrule()`
+
+
+**Q9.** Quelle est votre valeur p ? Est-ce significatif au niveau $\alpha=0.05$ ?
+
+`r begin_button(9)`
+
+**A9.** La valeur p est d'environ 0,37, ce qui est supérieur à 0,05, donc non significatif au niveau de 5 %. Sur la base de cette valeur, nous ne pouvons pas rejeter l'hypothèse nulle selon laquelle il n'y a pas de différence entre le COI dans les populations de contrôle et de moustiquaires.
+
+`r end_button()`
+`r hrule()`
+
+
+Il existe un moyen plus simple d'effectuer ce type de test t dans R, nous pouvons utiliser la fonction `t.test()`. Exécutez le code suivant - obtenez-vous les mêmes valeurs que vous avez calculées à la main?
+
+```{r}
+# Two-sample t-test assuming equal variances between groups
+t.test(COI_control, COI_nets, var.equal = TRUE)
+```
+
+
+## Analyse de puissance et calcul de la taille de l'échantillon {-}
+
+Avant de réaliser une étude comme celle ci-dessus, il est bon d'effectuer une analyse de puissance. Cela peut nous indiquer la chance de trouver quelque chose d'intéressant s'il est vraiment là. Plus exactement, cela nous indique la chance de rejeter correctement l'hypothèse nulle compte tenu de certaines hypothèses sur la taille de l'effet et la taille de l'échantillon.
+
+Ci-dessus, nous avons utilisé cette formule pour la statistique du test t :
+
+$t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\frac{\hat{s}_1^2 + \hat{s}_2^2}{n}}} $
+
+Réécrivons cela légèrement. Premièrement, nous utiliserons $d$ pour représenter la différence entre le COI moyen dans les deux populations. C'est cette différence qui nous intéresse - car c'est la différence entre nos deux traitements d'étude, interventions, _etc._, et donc on lui donne souvent le nom spécial **taille d'effet**. Une taille d'effet plus grande signifie qu'il y a une plus grande différence entre nos populations, et donc nous sommes plus susceptibles de le détecter. Deuxièmement, nous utiliserons $s^2$ pour représenter la variance du COI dans les deux populations (rappelez-vous, nous avons supposé que la variance est la même dans nos deux populations). La nouvelle version de la formule devient :
+
+$t = \frac{d}{\sqrt{\frac{2s^2}{n}}}$
+
+Le bloc de code suivant définit ces paramètres, puis trace la distribution de la statistique de test sous les hypothèses nulle et alternative. Les valeurs critiques, ou points "coupés" pour notre valeur $\alpha$ désignée (niveau de signification), de la distribution nulle sont représentées par des lignes pointillées verticales. Rappelons que la puissance est la proportion de la distribution rouge qui se trouve en dehors de ces lignes.
+
+```{r, out.width="60%"}
+# input parameters
+d <- 0.5
+s <- 2
+n <- 100
+alpha <- 0.05
+
+# produce plot
+plot_ttest(d, s, n, alpha)
+```
+
+**Q10.** Expérimentez en modifiant les paramètres d'entrée dans le code ci-dessus
+
+ - Que se passe-t-il lorsque vous augmentez la taille de l'effet (`d`) ?
+ - Que se passe-t-il lorsque vous augmentez l'écart type (`s`) ?
+ - Que se passe-t-il lorsque vous augmentez la taille de l'échantillon (`n`) ?
+ - Que se passe-t-il lorsque vous augmentez le seuil de signification (`alpha`) ?
+
+`r begin_button(10)`
+
+**A10.**
+
+ - L'augmentation de `d` provoque la séparation des distributions et augmente ainsi la puissance
+ - L'augmentation de `s` provoque le rapprochement des distributions et diminue ainsi la puissance
+ - L'augmentation de `n` provoque la séparation des distributions et augmente ainsi la puissance
+ - L'augmentation de `alpha` provoque le rapprochement des lignes pointillées et augmente ainsi la puissance
+
+`r end_button()`
+`r hrule()`
+
+
+La fonction suivante renvoie la zone de la courbe rouge qui se trouve en dehors des lignes pointillées (c'est-à-dire la puissance). Copiez cette fonction dans votre console :
+```{r}
+# returns the power under the t-test
+get_pow_ttest <- function(d, s, n, alpha = 0.05) {
+  pt(qt(alpha / 2, df = 2*n - 2), df = 2*n - 2, ncp = d / sqrt( 2*s^2 / n)) + 
+    pt(qt(1 - alpha / 2, df = 2*n - 2), df = 2*n - 2, ncp = d / sqrt( 2*s^2 / n), lower.tail = FALSE)
+}
+```
+
+**Q11.** Expérimentez en modifiant les paramètres d'entrée dans le code ci-dessous. Pour `d = 0,5`, `s = 1`, `alpha = 0,05`, pouvez-vous trouver une valeur de `n` qui atteint une puissance de 80 % ?
+
+```{r}
+# input parameters
+d <- 0.5
+s <- 1
+n <- 30
+alpha <- 0.05
+
+# calculate power
+get_pow_ttest(d, s, n, alpha)
+```
+
+`r begin_button(11)`
+
+**A11.** Une valeur de `n = 65` est nécessaire pour atteindre une puissance de 80 %.
+
+`r end_button()`
+`r hrule()`
+
+
+Parfois, il peut être utile de regarder les **courbes de puissance**. Celles-ci montrent la puissance sur l'axe des y et une autre variable sur l'axe des x, généralement la taille de l'échantillon.
+
+Copiez ce code dans votre console pour produire une courbe de puissance en fonction de 'n' :
+
+```{r, out.width="60%"}
+# input parameters
+d <- 0.5
+s <- 1
+n <- 2:100
+alpha <- 0.05
+
+# plot power curve
+qplot(x = n, y = get_pow_ttest(d, s, n, alpha)*100) + theme_bw() +
+  scale_y_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0, 0)) +
+  xlab("Sample size") + ylab("Power (%)")
+```
+
+**Q12.** Expérimentez avec différentes valeurs des paramètres d'entrée dans le code ci-dessus et voyez comment ceux-ci modifient la forme de la courbe. Que remarquez-vous sur la forme de cette courbe ? La puissance augmente-t-elle davantage quand on passe de `n = 25` à `n = 50`, ou de `n = 50` à `n = 75` ?
+
+`r begin_button(12)`
+
+**A12.** La courbe s'aplatit pour augmenter la taille de l'échantillon. Il y a une plus grande augmentation de puissance en passant de 'n = 25' à 'n = 50' par rapport au passage de 'n = 50' à 'n = 75'. Cela signifie que nous atteignons des * rendements décroissants * à mesure que nous obtenons de plus en plus d'échantillons.
+
+`r end_button()`
+`r hrule()`
+
+
+Les courbes de puissance sont idéales pour avoir une idée du nombre d'échantillons que nous pourrions vouloir dans un monde parfait, cependant, en réalité, il existe d'autres contraintes. Il n'est peut-être pas possible d'un point de vue logistique d'obtenir des échantillons de grande taille, ou cela peut être trop coûteux. Cela ne signifie pas que nous devrions abandonner complètement l'analyse de puissance - nous devrions plutôt essayer de travailler dans les limites. Une façon d'y parvenir est de fixer la taille de l'échantillon et de regarder à la place quelle taille d'effet nous sommes capables de détecter.
+
+Le code suivant produit une courbe de puissance pour une taille d'échantillon fixe, et avec la taille d'effet (`d`) sur l'axe des x. Copiez ce code dans votre console et expérimentez différentes valeurs des paramètres d'entrée.
+
+```{r, out.width="60%"}
+# input parameters
+d <- seq(0, 2, l = 101)
+s <- 1
+n <- 30
+alpha <- 0.05
+
+# plot power curve
+qplot(x = d, y = get_pow_ttest(d, s, n, alpha)*100) + theme_bw() +
+  scale_y_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0, 0)) +
+  xlab("Effect size") + ylab("Power (%)")
+```
+
+**Q13.** Imaginez que la taille de votre échantillon soit fixée par des contraintes logistiques à `n = 17`. Produire une courbe de puissance sous cette limitation. Quelle taille d'effet pouvez-vous détecter avec une puissance de 80 % ? Qu'est-ce que cela signifie pour le COI dans les deux groupes que vous comparez ?
+
+`r begin_button(13)`
+
+**A13.** Avec `n = 17`, nous pouvons détecter une taille d'effet d'environ 1,0 avec une puissance de 80 %. Cela signifie que le COI dans le groupe témoin doit être supérieur d'environ un, en moyenne, au COI dans le groupe des moustiquaires pour que nous ayons une bonne chance de détecter une différence.
+
+`r end_button()`
+`r hrule()`
+
+
+D'après l'analyse ci-dessus, nous pouvons voir que l'étude originale, qui utilisait une taille d'échantillon de "n = 10", avait une puissance extrêmement faible. Nous n'étions capables de détecter une différence significative entre les groupes que s'il y avait une différence de COI moyen supérieure à 1,5, ce qui est une différence assez importante. D'autre part, si nous voulions détecter des différences de COI jusqu'à 0,5, nous aurions besoin d'une taille d'échantillon plus proche de `n = 65`. Compte tenu de ces résultats, il n'est pas surprenant que nous ayons obtenu un résultat non significatif dans l'analyse des données réelles. Malheureusement, cette étude a probablement été une perte de temps et d'argent. Il a peut-être généré des statistiques descriptives intéressantes, et les résultats peuvent être utilisés comme données pilotes lors de la conception d'études futures, mais en termes de réponse à la question scientifique clé, il était voué à l'échec dès le départ. _**La dure vérité est que toutes les études ne valent pas la peine d'être faites !**_
+
+# Comparaison de la prévalence des mutations DR {-}
+
+## Tests statistiques {-}
+
+```{r, echo=FALSE, eval=FALSE}
+# code to generate the made-up DR data
+set.seed(33)
+pfcrt <- rbind.data.frame(data.frame(year = 2005, ID = sprintf("ID2005.%s", 1:800), pfcrt = rbinom(800, 1, 0.3)),
+                          data.frame(year = 2020, ID = sprintf("ID2020.%s", 1:1200), pfcrt = rbinom(1200, 1, 0.6)))
+
+pfcrt %>%
+  group_by(year) %>%
+  summarise(prev = mean(pfcrt),
+            sum = sum(pfcrt))
+
+save(pfcrt, file = "data/pfcrt.RData")
+```
+
+Votre programme national de lutte contre le paludisme (PNLP) vous a demandé d'établir si les mutations au locus de résistance à la chloroquine *pfcrt* ont augmenté de manière significative dans votre zone d'étude entre 2005 et 2020. Deux enquêtes transversales ont été menées, avec un grand nombre d'échantillons obtenus et séquencés avec succès chaque année.
+
+Chargeons les données et regardons :
+```{r}
+# load COI data
+load("data/pfcrt.RData")
+
+head(pfcrt)
+```
+
+Nous pouvons voir que nos données sont organisées dans un data.frame, et en *format long*, ce qui signifie que tous les facteurs (par exemple, l'année) sont en colonnes. Pour chaque ID individuel, nous avons une valeur binaire 1/0 indiquant si l'échantillon contenait la mutation *pfcrt*. Notre première tâche est de résumer ces données pour nous dire :
+
+- Le nombre d'échantillons obtenus chaque année
+- La proportion d'échantillons contenant la mutation *pfcrt* (c'est-à-dire la prévalence de la mutation)
+
+**Q14.** Complétez le code suivant pour 1) regrouper les données par année, et 2) résumer pour obtenir la prévalence des mutations *pfcrt*. La prévalence de la mutation a-t-elle augmenté ou diminué avec le temps ?
+
+```{r, eval=FALSE}
+pfcrt_summary <- pfcrt %>%
+  group_by( # TO COMPLETE ) %>%
+  summarise(n = n(),
+            prev = #TO COMPLETE )
+              
+pfcrt_summary
+```
+
+`r begin_button(14)`
+
+**A14.** Voici un exemple du code complété. La mutation a plus que doublé en prévalence au fil du temps.
+```{r}
+pfcrt_summary <- pfcrt %>%
+  group_by(year) %>%
+  summarise(n = n(),
+            prev = mean(pfcrt))
+
+pfcrt_summary
+```
+
+`r end_button()`
+`r hrule()`
+
+
+Pour notre test statistique, nous voulons comparer deux valeurs comme dans l'exemple COI ci-dessus, mais cette fois nos valeurs sont des proportions, et sont donc contraintes d'être comprises entre 0 et 1. Le test approprié ici n'est pas le test t, mais plutôt le test Z à deux proportions. La statistique de test est calculée comme suit :
+
+$Z = \frac{\hat{p}_1 - \hat{p}_2}{\sqrt{\frac{\hat{p}_1(1 - \hat{p}_1)}{n_1} + \frac {\chapeau{p}_2(1 - \chapeau{p}_2)}{n_2}}}$
+
+où $\hat{p}_1$ et $\hat{p}_2$ sont les prévalences dans les deux groupes et $n_1$ et $n_2$ sont les tailles d'échantillon. $\bar{p}$ est la prévalence moyenne, calculée comme suit : $\bar{p} = \frac{n_1\hat{p}_1 + n_2\hat{p}_2}{n_1 + n_2}$ Le code suivant calcule cette statistique :
+
+```{r}
+# get values from summary table
+n <- pfcrt_summary$n
+p <- pfcrt_summary$prev
+p_bar <- sum(n*p) / sum(n)
+
+# calculate Z statistic
+Z <- (p[1] - p[2]) / sqrt(p_bar*(1 - p_bar) * (1/n[1] + 1/n[2]))
+Z
+```
+
+Pour le test z, la distribution de la statistique de test sous l'hypothèse nulle est la distribution z, également appelée **distribution normale**. Pour la distribution normale, les "queues" à 5 % sont à -1,96 et +1,96.
+
+**Q15.** Votre valeur Z observée est-elle dans le corps ou les queues de la distribution ? Qu'est-ce que cela vous dit sur la probabilité que nous voyions une valeur aussi extrême par hasard ?
+
+`r begin_button(15)`
+
+**A15.** La valeur observée est loin dans la queue de la distribution. Il est extrêmement peu probable que nous voyions une valeur aussi extrême que celle-ci sous l'hypothèse nulle d'aucune différence de prévalence entre les groupes.
+
+`r end_button()`
+`r hrule()`
+
+
+Nous pouvons calculer une valeur p comme suit :
+```{r}
+# calculate p-value
+2*pnorm(abs(Z), lower.tail = FALSE)
+```
+
+**Q16.** La différence de prévalence *pfcrt* est-elle significative au seuil de 5 % ? Accepteriez-vous ou rejetteriez-vous l'hypothèse nulle ?
+
+`r begin_button(16)`
+
+**A16.** La valeur de p est très petite, bien en dessous du seuil de 5 %. Dans ce cas, nous rejetterions l'hypothèse nulle d'absence de différence entre les groupes. En d'autres termes, nous concluons qu'il existe une grande différence (dans ce cas une augmentation) de la prévalence *pfcrt* de 2005 à 2020.
+
+`r end_button()`
+`r hrule()`
+
+Comme pour le test t, il existe un moyen plus simple d'effectuer un test Z à deux proportions dans R, nous pouvons utiliser la fonction `prop.test()`. Cela effectue la même analyse que nous venons de faire à la main ci-dessus :
+
+```{r}
+prop.test(x = n*p, n = n, correct = FALSE)
+```
+
+
+## Analyse de puissance et calcul de la taille de l'échantillon {-}
+
+Comme précédemment, nous effectuerons une analyse de puissance pour déterminer si cette étude a été bien conçue. Nous garderons les choses simples en supposant le même nombre d'échantillons au cours des deux années. Nous pouvons réécrire la formule de la statistique Z comme suit :
+
+$Z = \frac{p_1 - p_2}{\sqrt{\frac{2\bar{p}(1 - \bar{p})}{n}}}$
+
+où $n$ est maintenant la taille de l'échantillon pour les deux années (remplaçant $n_1$ et $n_2$ dans la version précédente).
+
+Le code suivant trace la distribution de la statistique Z sous les hypothèses nulle et alternative, similaire à ce que nous avons fait pour l'exemple de test t ci-dessus. Expérimentez avec différentes valeurs et voyez comment elles affectent les distributions.
+
+```{r, out.width="60%"}
+# variable parameters
+p1 <- 0.3
+p2 <- 0.6
+n <- 800
+alpha <- 0.05
+
+# produce plot
+plot_ztest(p1, p2, n, alpha)
+```
+
+Nous pouvons également écrire une fonction pour calculer exactement la puissance (la zone de la distribution rouge qui est au-delà des lignes pointillées) :
+
+```{r}
+# function that returns the power given these parameters
+get_pow_ztest <- function(p1, p2, n, alpha = 0.05) {
+  p_bar <- mean(c(p1, p2))
+  alt_mean <- (p1 - p2) / sqrt(2*p_bar*(1 - p_bar) / n)
+  pnorm(qnorm(alpha / 2), mean = alt_mean) + pnorm(qnorm(1 - alpha / 2), mean = alt_mean, lower.tail = FALSE)
+}
+```
+
+**Q17.** Lors du calcul de la puissance, nous devons faire des hypothèses sur la taille de l'effet (dans ce cas, la prévalence réelle au cours des deux années) et la taille de l'échantillon. Le NMCP vous a demandé de calculer la puissance selon les hypothèses suivantes :
+
+- La prévalence double de 40% à 80%
+- La prévalence double de 30% à 60%
+- La prévalence double de 20% à 40%
+- La prévalence passe de 30% à 45%
+
+Supposons une taille d'échantillon de `n = 1000` tout au long.
+
+`r begin_button(17)`
+
+**A17.** La puissance est très élevée, supérieure à 99,99 % dans tous les cas.
+```{r, results='hold'}
+get_pow_ztest(p1 = 0.4, p2 = 0.8, n = 1000)
+get_pow_ztest(p1 = 0.3, p2 = 0.6, n = 1000)
+get_pow_ztest(p1 = 0.2, p2 = 0.4, n = 1000)
+get_pow_ztest(p1 = 0.3, p2 = 0.45, n = 1000)
+```
+
+`r end_button()`
+`r hrule()`
+
+
+Nous pouvons produire une courbe de puissance en passant une plage de valeurs de "n" dans notre fonction. Expérimentez avec différents paramètres dans le code ci-dessous pour voir comment ils modifient la forme de la courbe de puissance :
+
+```{r, out.width="60%"}
+# variable parameters
+p1 <- 0.4
+p2 <- 0.8
+n <- 5:500
+
+# plot power curve
+qplot(x = n, y = get_pow_ztest(p1, p2, n, alpha)*100) + theme_bw() +
+  scale_y_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0, 0)) +
+  xlab("Sample size") + ylab("Power (%)")
+```
+
+**Q18.** Produisez des courbes de puissance pour les quatre scénarios que le PNLP vous a demandé d'explorer. Quelle est la taille approximative de l'échantillon nécessaire dans chaque cas pour atteindre une puissance de 80 % ?
+
+`r begin_button(18)`
+
+**A18.** Les tailles d'échantillons approximatives nécessaires sont de 20, 40, 80 et 190 pour les quatre scénarios.
+
+`r end_button()`
+`r hrule()`
+
+
+Parfois, il est possible de trouver une formule pour la taille de l'échantillon. Dans ce cas, la formule peut s'écrire :
+
+$n = (z_{\alpha/2} + z_\beta)^2 \frac{2\bar{p}(1 - \bar{p})}{(p_1 - p_2)^2}$
+
+où $z_{\alpha/2}$ est la valeur critique à un niveau de signification $\alpha$ (bilatéral), dont nous avons déjà noté qu'il est d'environ 1,96. $z_\beta$ est une valeur similaire, cette fois calculée à partir de $\beta$ qui est défini comme 1 moins la puissance souhaitée (dans notre cas $\beta = 0,2$ pour une puissance de 80%). La fonction suivante implémente cette formule pour donner la taille d'échantillon nécessaire pour une puissance donnée :
+
+```{r}
+get_n_ztest <- function(p1, p2, alpha = 0.05, power = 0.8) {
+  p_bar <- mean(c(p1, p2))
+  (qnorm(1 - alpha / 2) + qnorm(power))^2 * 2*p_bar*(1 - p_bar) / (p1 - p2)^2
+}
+```
+
+Cette formule donne parfois des valeurs non entières, auquel cas elles doivent être arrondies au nombre entier le plus proche.
+
+**Q19.** Utilisez cette fonction exacte pour calculer la taille d'échantillon requise pour chacun des quatre scénarios demandés par le PNLP. Quelles valeurs obtenez-vous ? Laquelle de ces valeurs devriez-vous adopter comme recommandation finale ?
+
+`r begin_button(19)`
+
+**A19.** Pour les scénarios ci-dessous, nous obtenons des tailles d'échantillon de 24, 44, 83 et 187. Nous devrions prendre le plus grand de ces forwards comme notre recommandation, car nous aurons alors une puissance suffisante pour l'un des scénarios.
+```{r, results='hold'}
+get_n_ztest(p1 = 0.4, p2 = 0.8, power = 0.8)
+get_n_ztest(p1 = 0.3, p2 = 0.6, power = 0.8)
+get_n_ztest(p1 = 0.2, p2 = 0.4, power = 0.8)
+get_n_ztest(p1 = 0.3, p2 = 0.44, power = 0.8)
+```
+
+`r end_button()`
+`r hrule()`
+
+
+**Q20.** Le coût de l'étude, prenant en compte le temps clinique, le temps de laboratoire et le coût du séquençage, est estimé à 50 USD par échantillon. Quel est le coût estimé de l'étude originale qui a utilisé 800 échantillons en 2005 et 1200 échantillons en 2020 ? Quel est le coût de votre nouvelle conception d'étude sur la base de votre analyse de puissance (rappelez-vous que le "n" que vous avez calculé est pour *chacune* des deux années) ?
+
+`r begin_button(20)`
+
+**A20.** Le coût de l'étude originale était de 100 000 USD. Avec une taille d'échantillon de 187 par an, le nouveau coût descend à 18 700 USD.
+
+`r end_button()`
+`r hrule()`
+
+
+Ce que nous avons vu ici est un exemple d'une étude surpuissante. Bien que nous puissions penser qu'il n'y a pas de mal à collecter plus d'échantillons, nous devons garder à l'esprit que chaque étude a des coûts et que les fonds pourraient être mieux dépensés ailleurs. Dans ce cas, nous avons constaté qu'une conception correctement alimentée était plus de 5 fois moins chère que l'étude originale. Le PNLP aurait pu mener la même étude dans 5 régions différentes du pays, ou sur plusieurs années, et aurait quand même réalisé une économie de coûts. Ainsi, bien qu'il soit généralement judicieux d'être prudent lors du calcul de la taille des échantillons, en optant pour des valeurs plus élevées en cas de doute, cette approche a des limites et il est possible de collecter trop d'échantillons. Quelle que soit la situation, réaliser une analyse de puissance formelle **avant** la réalisation de l'étude est un excellent moyen d'explorer ces questions.
+
+Une dernière chose à noter est que les formules utilisées dans ce calcul de puissance ne sont que des approximations. En règle générale, les méthodes de simulation ou de calcul fourniront des résultats plus précis car elles ne font pas les mêmes approximations. La fonction `get_pow_ztest_exact()` ci-dessous utilise cette approche pour calculer exactement la puissance, qui peut être comparée à la fonction `get_pow_ztest()` utilisée ci-dessus. Pouvez-vous trouver des combinaisons de paramètres où ils sont d'accord/pas d'accord ?
+
+```{r, results='hold'}
+get_pow_ztest(p1 = 0.2, p2 = 0.5, n = 20)
+get_pow_ztest_exact(p1 = 0.2, p2 = 0.5, n = 20)
+```
+
+
+# Gérer le décrochage {-}
+
+Une chose dont nous devons être conscients lors du calcul de la taille des échantillons est l'abandon. Cela fait référence à tout ce qui fait que la taille de notre échantillon final est inférieure à ce que nous avions initialement prévu. Le décrochage peut survenir pour de nombreuses raisons, notamment :
+
+- Personnes retirant leur consentement à l'étude
+- Personnes mourant ou migrant hors de la zone d'étude
+- Échantillons ne répondant pas aux critères requis pour l'analyse (par exemple, être non-* vivax * dans une étude * falciparum *)
+- Échantillons perdus ou contaminés
+- Échantillons en échec de séquençage, par exemple en raison d'une faible parasitémie
+
+Nous devons tenir compte de l'abandon dans nos calculs de taille d'échantillon pour nous assurer qu'il nous reste suffisamment d'échantillons pour notre analyse finale. La formule pour ajuster le décrochage est assez simple :
+
+$n_{\text{ajusté}} = \frac{n_{\text{original}}}{1 - p_{\text{abandon}}}$
+
+où $n_{\text{original}}$ est la taille de l'échantillon brut que nous obtenons de notre analyse de puissance, et $p_{\text{dropout}}$ est la proportion d'abandons attendus pour une raison particulière. Par exemple, si la taille de notre échantillon d'origine est `n = 100` et que nous prévoyons un abandon de 20 %, nous faisons $n_{\text{ajusté}} = 100 / (1 - 0,2) = 100 / 0,8 = 125 $. Nous avons donc besoin de 125 personnes pour tenir compte de ce nombre d'abandons. Nous pouvons facilement vérifier ceci : si nous avons 125 personnes et que 20 % d'entre elles abandonnent, nous perdons 25 personnes, ce qui nous ramène à 100.
+
+**Q21.** Un programme de contrôle souhaite déterminer si la fréquence des mutations *dhps* K540E dans son pays est supérieure à 10 %. Si tel est le cas, ils prévoient de remplacer les médicaments de première intention par la sulfadoxine-pyriméthamine. Ils prévoient de reproduire cette étude dans 5 régions distinctes à travers le pays. Un calcul statistique de la taille de l'échantillon a révélé que 220 échantillons seront nécessaires pour obtenir la puissance souhaitée. Cependant, chacun des 5 laboratoires impliqués dans le traitement des échantillons a des niveaux d'expérience différents, ce qui entraîne des taux différents d'échantillons perdus. La proportion estimée d'échantillons perdus dans chacun des laboratoires est la suivante :
+
+Labo1 : 10 %
+Labo2 : 3 %
+Labo3 : 14 %
+lab4 : 25 %
+lab5 : 9 %
+
+Quelle taille d'échantillon ajustée est nécessaire pour chacune des 5 régions ? N'oubliez pas d'arrondir les valeurs au nombre entier le plus proche.
+
+`r begin_button(21)`
+
+**A21.** Les tailles d'échantillon ajustées peuvent être calculées comme suit. La fonction `ceiling()` garantit que les valeurs sont arrondies.
+```{r}
+# define proportion dropout in each of the labs
+p_dropout <- c(lab1 = 0.1, lab2 = 0.03, lab3 = 0.14, lab4 = 0.25, lab5 = 0.09)
+
+# calculate adjusted sample sizes
+ceiling(220 / (1 - p_dropout))
+```
+
+`r end_button()`
+`r hrule()`
+
+
+Parfois, nous devons effectuer l'ajustement ci-dessus plusieurs fois. Par exemple, nous pourrions nous attendre à perdre 5 % des échantillons en raison du retrait du consentement, et sur les échantillons restants, nous prévoyons de perdre 10 % en raison d'un échec du séquençage. Dans ce cas, nous devons d'abord ajuster pour la perte de 5 %, puis * en utilisant la nouvelle valeur ajustée * nous devons ajuster pour la perte de 10 %. Notez que cela ne donne pas exactement la même chose que si nous comptabilisions la totalité des 15 % en une seule fois.
+
+**Q22.** Un programme de contrôle mène une étude dans laquelle ils suivent des personnes sur une période de 6 mois et mesurent l'incidence du paludisme. Les parasites seront génotypés périodiquement pour déterminer si des génotypes identiques ou différents sont présents. Le calcul statistique de la taille de l'échantillon a indiqué qu'ils avaient besoin de 400 échantillons au total sur la période de 6 mois. Ils s'attendent à perdre 15 % des échantillons en raison de la perte de suivi (par exemple, les personnes qui migrent ou abandonnent l'étude). Parmi ceux qui sont séquencés, ils s'attendent à ce que 10 % des échantillons échouent. Quelle est la taille finale ajustée de l'échantillon dont ils ont besoin ?
+
+`r begin_button(22)`
+
+**A22.** Les tailles d'échantillon ajustées peuvent être calculées comme suit.
+```{r}
+ceiling(400 / (1 - 0.15) / (1 - 0.1))
+```
+
+`r end_button()`
+`r hrule()`
+
+
+# Mise en pratique {-}
+
+J'espère qu'à ce stade, vous vous sentez à l'aise avec les bases de l'analyse de puissance et du calcul de la taille de l'échantillon. Les exemples ci-dessus ont été conçus pour illustrer les principaux points d'apprentissage, mais les analyses du monde réel ont tendance à être un peu plus compliquées et impliquent une réflexion créative. Essayez d'aborder le problème plus réaliste suivant.
+
+**Q23. (exercice long)**
+Vous avez été recruté par le NMCP de Zambie pour mener une étude sur l'évolution de la prévalence des mutations *dhps* K540E. Ils ont une série d'échantillons qui ont été recueillis dans une étude pilote en 2001 à partir de 5 emplacements d'échantillonnage différents. Ces échantillons ont été séquencés et donnent des estimations de base de la prévalence des mutations K540E dans chacun des emplacements. Ils prévoient de mener une étude actuelle dans les mêmes endroits pour déterminer si la prévalence a changé de manière significative au cours de cette période.
+
+```{r, echo=FALSE, eval=FALSE}
+# make up some pilot data and save to file
+Zambia_pilot <- rbind.data.frame(list(location = "Kabwe", total_samples = 80, K540E = 11),
+                                 list(location = "Ndola", total_samples = 24, K540E = 6),
+                                 list(location = "Chipata", total_samples = 110, K540E = 13),
+                                 list(location = "Mansa", total_samples = 90, K540E = 14),
+                                 list(location = "Lusaka", total_samples = 70, K540E = 12))
+
+Zambia_logistics <- rbind.data.frame(list(location = "Kabwe", fail_fraction = 0.10),
+                                     list(location = "Ndola", fail_fraction = 0.06),
+                                     list(location = "Chipata", fail_fraction = 0.30),
+                                     list(location = "Mansa", fail_fraction = 0.02),
+                                     list(location = "Lusaka", fail_fraction = 0.04))
+
+save(Zambia_pilot, file = "data/Zambia_pilot.RData")
+save(Zambia_logistics, file = "data/Zambia_logistics.RData")
+```
+
+Voici les données pilotes :
+
+```{r}
+load("data/Zambia_pilot.RData")
+Zambia_pilot
+```
+
+Vous avez également quelques informations sur les contraintes logistiques. Les échantillons seront séquencés dans plusieurs laboratoires différents, et vous disposez d'estimations de la fraction susceptible d'échouer à chaque emplacement :
+
+```{r}
+load("data/Zambia_logistics.RData")
+Zambia_logistics
+```
+
+Le budget de l'étude permet de séquencer 1000 échantillons au total sur les 5 sites.
+
+Dans cet exemple, nous connaissons la taille de l'échantillon dans le premier groupe ($n_1$) et nous essayons de déterminer la taille de l'échantillon requise dans le deuxième groupe ($n_2$). Cela conduit à la formule suivante :
+
+$n_2 = \frac{p_2(1 - p_2)}{\frac{(p_1 - p_2)^2}{(z_{\alpha/2} + z_\beta)^2} - \frac{p_1(1 - p_1)}{n_1}}$
+
+Cette formule n'est valable que tant que $n_1 > (z_{\alpha/2} + z_\beta)^2 \frac{p_1(1 - p_1)}{(p_1 - p_2)^2}$. Si $n_1$ est inférieur à cette valeur, il est impossible d'atteindre la puissance souhaitée avec n'importe quelle taille d'échantillon.
+
+Il vous a été demandé de :
+
+1. Estimer la prévalence des mutations K540E en 2001 à partir des données pilotes.
+2. Écrivez une nouvelle fonction pour implémenter la formule de taille d'échantillon ci-dessus. Vous pourriez trouver utile de regarder la fonction `get_n_ztest()` définie dans le précédent comme guide.
+3. Utilisez votre nouvelle fonction pour effectuer le calcul de la taille de l'échantillon dans chaque emplacement, en supposant que la prévalence a doublé depuis l'étude pilote. Visez 80% de puissance.
+3. Ajuster la taille des échantillons pour tenir compte de l'abandon.
+4. Calculez votre nombre total d'échantillons pour l'étude. Est-ce dans le budget ?
+5. Si ce n'est pas le cas, y a-t-il un emplacement que vous pourriez supprimer pour respecter votre budget ? Justifiez votre choix d'emplacement.
+6. Rédigez un paragraphe de synthèse à envoyer au PNLP avec votre recommandation. Cela devrait décrire vos hypothèses ainsi que vos conclusions. Il doit contenir une valeur claire pour la taille d'échantillon requise dans chaque emplacement.
+
+
+`r begin_button(23)`
+
+**A23.**
+On peut commencer par calculer la prévalence à partir des données pilotes :
+```{r}
+Zambia_analysis <- Zambia_pilot %>%
+  mutate(prev_2001 = K540E / total_samples)
+
+Zambia_analysis
+```
+
+Ensuite, nous devons définir une fonction pour implémenter la nouvelle formule de taille d'échantillon. Voici un exemple de ce à quoi cela pourrait ressembler. Notez que cette fonction contient une vérification pour s'assurer qu'un avertissement est produit si aucune taille d'échantillon finie n'est possible.
+```{r}
+get_n2_ztest <- function(p1, p2, n1, alpha = 0.05, power = 0.8) {
+  # perform the calculation in three parts
+  part1 <- p2*(1 - p2)
+  part2 <- (p1 - p2)^2 / (qnorm(1 - alpha / 2) + qnorm(power))^2
+  part3 <- p1*(1 - p1) / n1
+  
+  # get final value
+  ret <- part1 / (part2 - part3)
+  
+  # replace with NA if outside range and throw warning
+  ret[part2 < part3] <- NA
+  
+  # check that there is a value of n2 that is valid
+  if (any(is.na(ret))) {
+    warning("There is no finite value of n2 that achieves the desired power")
+  }
+  
+  return(ret)
+}
+```
+
+On nous a demandé de supposer que la prévalence double à chaque endroit :
+```{r}
+Zambia_analysis <- Zambia_analysis %>%
+  mutate(prev_now = prev_2001 * 2)
+
+Zambia_analysis
+```
+
+Nous pouvons utiliser notre fonction `get_n2_ztest()` pour calculer la taille d'échantillon optimale à chaque emplacement, en supposant une puissance de 80 % :
+```{r}
+Zambia_analysis <- Zambia_analysis %>%
+  mutate(n_raw = get_n2_ztest(prev_2001, prev_now, total_samples, alpha = 0.05, power = 0.8))
+
+Zambia_analysis
+```
+
+Nous devons ajuster ces valeurs brutes pour tenir compte de l'abandon. Nous pouvons le faire en fusionnant avec le data.frame logistique, puis en utilisant la formule d'abandon :
+```{r}
+Zambia_analysis <- Zambia_analysis %>%
+  left_join(Zambia_logistics) %>%
+  mutate(n_adjusted = ceiling(n_raw / (1 - fail_fraction)))
+
+Zambia_analysis
+```
+
+Enfin, nous pouvons calculer la taille totale de l'échantillon de l'étude :
+```{r}
+sum(Zambia_analysis$n_adjusted)
+```
+
+Nous constatons que `r sum(Zambia_analysis$n_adjusted)` échantillons sont nécessaires au total, ce qui dépasse notre budget de 1 000 échantillons. En regardant les emplacements, la grande majorité de ces échantillons proviennent de la région de Ndola. La raison de la taille énorme de l'échantillon dans cette région est que nous avions très peu de données pilotes - seulement 24 échantillons. Avec si peu d'échantillons, nous avons peu confiance en ce qu'était la véritable prévalence en 2001, et nous avons donc besoin d'un grand nombre d'échantillons pour dire de manière concluante que la prévalence a doublé. Si nous excluons uniquement cette région, nous nous retrouvons dans les limites du budget. Nous pouvons vouloir collecter des échantillons de Ndola pour d'autres raisons, par exemple pour nous donner une nouvelle base pour des études ultérieures, mais si notre objectif est de détecter des changements de prévalence au fil du temps, il est peu probable que cette région donne des résultats significatifs.
+
+En résumé, voici ce que nous dirions au PNLP :
+
+Nous vous recommandons de collecter les tailles d'échantillons suivantes :
+
+```{r}
+Zambia_analysis %>%
+  filter(location != "Ndola") %>%
+  select(location, n_adjusted)
+```
+
+Ces tailles d'échantillons nous donnent une puissance de 80 % dans chaque emplacement pour détecter un doublement de la prévalence de K540E depuis 2001. Les tailles d'échantillons ont été ajustées pour tenir compte de la fraction attendue d'échec dans les procédures de laboratoire. La région de Ndola a été exclue de cette analyse car les données pilotes de cette zone étaient très faibles, ce qui signifie que nous n'avons pas été en mesure d'atteindre la puissance souhaitée dans les limites budgétaires.
+
+`r end_button()`
+`r hrule()`
+
