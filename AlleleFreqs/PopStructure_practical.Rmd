@@ -50,104 +50,433 @@ color: #004c93;
 Please copy and paste the below code chunk in it's entirety to your console to download R package libraries needed for this practical. If you are having trouble installing any of the R packages, please ask an instructor for a pre-loaded flash drive.
 
 ```{r, echo=T}
-# deps <- c("tidyverse", "vcfR", , "sf", "tidygraph", "hierfstat","rmaverick")
-# deps <- !sapply(deps, function(x){x %in% installed.packages()[,1]} )
-# if(any(deps)) {0
-#   if(deps["hierfstat"]) {
-#     if(!"gaston" %in% installed.packages()[,1]){
-#       install.packages("gaston")
-#     }
-#     }if(deps["rmaverick"]){
-#       devtools::install_github("bobverity/rmaverick")
-#     } else  {
-#     install.packages(names(deps)[deps])
-#   }
-# }
-
-
+deps <- c("tidyverse", "genescaper", "MIPanalyzer","rmaverick")
+deps <- !sapply(deps, function(x){x %in% installed.packages()[,1]})
+if (any(deps)) {
+  if (deps["tidyverse"]) {
+    install.packages("tidyverse")
+  }
+  if (deps["genescaper"]) {
+    devtools::install_github("mrc-ide/genescaper", ref = "v0.1.0")
+  }
+  if (deps["MIPanalyzer"]) {
+    devtools::install_github("mrc-ide/MIPanalyzer", ref = "v1.0.0")
+  }
+  if (deps["rmaverick"]) {
+    devtools::install_github("bobverity/rmaverick", ref = "v1.1.0")
+  }
+}
 ```
 
 Now load all of those libraries into this session using the code chunk below. Please copy and paste it in its entirety.
 
 ```{r, echo=T}
 library(tidyverse)
-library(vcfR)
+library(genescaper)
+library(MIPanalyzer)
 library(rmaverick)
-library(hierfstat) 
-library(sf)
-library(tidygraph)
 ```
 
+Finally, source the additional functions that are needed for this practical by copy-pasting this function:
+
+```{r, echo=T}
+source("source_functions/pop_structure_utils.R")
+```
+
+
 # Intro to population structure and allele frequency metrics {-}
--Why useful for epi?
-***
 
-# Overview of Data {-}
- 
-***
+One of the most fundamental observations that we can make from genetic data is how the frequencies of different alleles vary over time and over space. For loci where mutations confer drug resistance, allele frequencies tell us something with direct clinical implications - if an allele is at high frequencies then we might consider switching first-line drugs. However, even for loci that have no direct impact on phenotype, and therefore are selectively neutral, allele frequencies can give us important information about what is going on in the parasite population. These loci will be influenced by factors such as prevalence, human and mosquito population size, and migration rates between different sub-populations. If we can correctly interpret these signals then we can use neutral allele frequencies to tell us things about population structure and connectivity that can be relevant for control purposes.
 
-# Practical Goals {-}
+### Overview of Data {-}
+
+We will work with both simulated and real data in this practical. The simulated data will allow us to explore how allele frequencies change over time as a function of different underlying parameters - something that we can almost never do from messy real-world data. This will allow us to build up an intuition about what we would expect to see in real data. In the second half of the practical, we will use real-world datasetes including a large molecular inversion probe (MIP) dataset taken from DRC and surrounding countries, previously analysed by [Verity et al. 2020](https://pubmed.ncbi.nlm.nih.gov/32355199/). We will use this to explore population structure in various ways.
+
+### Practical Goals {-}
 By the end of this practical, you should be able to: 
 
-- Calculate allele frequencies from genetic data 
+- Describe how population size, mutation and migration rates affect the patterns that we expect to see in neutral allele frequency data
 - Estimate metrics such as FST and explain what they can tell us about population differentiation
+- Use ordination techniques like PCA to explore patterns of population structure
+- Use model-based techniques like *rmaverick* to detect population structure in a probability-driven way
 - Appreciate how allele frequency methods can identify connectivity over large spatial scales and long temporal scales
 - Explain how allele frequencies can give useful information, and also describe their limitations for malaria control purposes
 
 
 -------------------------
-# Importing Data
 
-Here, we will use the `vcfR` [package](https://knausb.github.io/vcfR_documentation/) to read in our variant call file (VCF) that contains biallelic SNPs for our \*\*\* individuals across our four populations.
+# Population genetics through simulation {-}
 
-Read in the VCF from our data folder that you downloaded from Github: `data/INSERTFILEPATH.vcf`. If you are having trouble locating the file on your computer, please type `file.choose` into your console for an interactive option to locate the file. Name the object (the vcf file you are reading in) *vcf* for simplicity.
+Explanation of the term "deme"?
+
+## Focusing on a single subpopulation {-}
+
+### Allele frequency changes in a single deme {-}
+
+Try running this function lots of times. What do you notice about the allele frequency over time?
 
 ```{r}
-#vcf <- vcfR::read.vcfR("data/FILEPATH.vcf")
+sim1 <- sim_freqs(N = 1000, mut_rate = 0)
+```
+
+Now repeat with a smaller population size (which represents the number of *infected* hosts in our case). What do you notice about the strength of drift? What happens once an allele reaches a frequency of 0 or 1? Why is this?
+
+```{r}
+sim_freqs(N = 100, mut_rate = 0)
+```
+
+Now repeat the simulation, this time running for 10 years and with some mutation. Do frequencies still always end up fixed/lost?
+
+```{r}
+sim_freqs(N = 1000, t_out = seq(0, 365 * 10), mut_rate = 1e-4)
+```
+
+### The allele frequency spectrum {-}
+
+We will now simulate a large number of loci, but output at just a single timepoint.
+
+```{r}
+# simulate allele frequencies and look at the data
+sim1 <- sim_freqs(N = 1000, t_out = 365 * 5, mut_rate = 1e-6, loci = 1e3, plot_on = FALSE)
+head(sim1$data)
+```
+
+We can plot this allele frequency spectrum
+
+```{r}
+# simulate allele frequencies and look at the data
+ggplot(sim1$data) +
+  geom_histogram(aes(x = freq), breaks = seq(0, 1, 0.01))
+```
+
+What happens if you increase the mutation rate? What happens if you increase the population size?
+
+### The buildup of homozygosity {-}
+
+Run the code below multiple times to repeat the simulation of drift, but now also plotting homozygosity. What do you notice about how homozygosity changes over time? (It always increases to 1).
+
+```{r}
+sim_freqs(N = 1000, t_out = seq(0, 365 * 10, 7), plot_homo = TRUE)
+```
+
+What happens when you add in some mutation? Try mutation rates of 1e-3 and 1e-4. What happs to the equilibrium level of homozygosity?
+
+```{r}
+sim_freqs(N = 1000, t_out = seq(0, 365 * 10, 7), mut_rate = 1e-4, plot_homo = TRUE)
+```
+
+We can add in a line showing the theoretical expectation.
+
+```{r}
+sim_freqs(N = 1000, t_out = seq(0, 365 * 5, 7), mut_rate = 1e-4, plot_homo = TRUE, plot_expected_homo = TRUE)
+```
+
+## Multiple subpopulations {-}
+
+### Perfectly isolated subpopulations {-}
+
+Try running 10 independent subpopulations. Notice that allele frequencies tend to diverge
+
+```{r}
+sim1 <- sim_freqs(N = 1000, demes = 10, mig_rate = 0, mut_rate = 1e-4)
+```
+
+We can calculate a simple version of Fst manually
+
+```{r}
+sim_fst <- sim1$data %>%
+  select(-locus) %>%
+  group_by(time) %>%
+  summarise(p_mean = mean(freq),
+            p_var = var(freq),
+            Fst = p_var / (p_mean * (1 - p_mean)))
+```
+
+Now lets plot Fst over time. What do you notice about differentiation?
+
+```{r}
+ggplot(sim_fst) +
+  geom_line(aes(x = time, y = Fst)) +
+  expand_limits(y = c(0, 1))
+```
+
+What happens if you repeat the process above with a higher mutation rate?
+
+```{r}
+sim1 <- sim_freqs(N = 100, demes = 10, mig_rate = 0, mut_rate = 1e-3,
+                  t_out = seq(0, 365*10, 7), plot_on = FALSE)
+sim1$data %>%
+  select(-locus) %>%
+  group_by(time) %>%
+  summarise(p_mean = mean(freq),
+            p_var = popvar(freq),
+            Fst = p_var / (p_mean * (1 - p_mean))) %>%
+  ggplot() + theme_bw() +
+  geom_line(aes(x = time, y = Fst)) +
+  expand_limits(y = c(0, 1))
+```
+
+The equilibrium level of Fst is known to be 1/(1 + 2*N*mu) in this case. How does this level compare with what you saw in the plot?
+
+```{r}
+# e.g. use
+#geom_hline(yintercept = 1 / (1 + 2*1e2*1e-3), linetype = "dashed")
+```
+
+The fact that Fst depends on the mutation rate can lead to problems. If one marker has a high mutation rate (e.g. microsat) then we would expect to see low values of Fst, even if the populations have been evolving separately for a long time, and in this sense are well differentiated.
+
+Jost's D is an alternative way of looking at differentiation.
+
+```{r}
+sim1 <- sim_freqs(N = 100, demes = 10, mig_rate = 0, mut_rate = 1e-3,
+                  t_out = seq(0, 365*10, 7), plot_on = FALSE)
+
+sim1$data %>%
+  select(-locus) %>%
+  group_by(time) %>%
+  summarise(Js = mean(freq^2 + (1 - freq)^2),
+            Jt = mean(freq)^2 + mean(1 - freq)^2,
+            D = (Js - Jt) / Js * max(deme) / (max(deme) - 1)) %>%
+  ggplot() + theme_bw() +
+  geom_line(aes(x = time, y = D)) +
+  expand_limits(y = c(0, 1.2))
+```
+
+Jost's D does not suffer from the same problem as Fst, but it suffers from a different problem - it assumes infinite alleles mutation. When we have a biallelic SNP, Jost's D will tend to reach values of around 0.5 at equilibrium. (This is actually a bit of a subtle point - maybe easier to understand if I generalise the above to allow more than two alleles?)
+
+Conclusion - both Fst and D have their limitations. Fst is good when mutation rates are low, for example biallelic SNPs. Jost's D is good for highly diverse and fast-mutating sites, such as microsats.
+
+
+### Connected subpopulations {-}
+
+What happens when we connect our demes up by migration? Try experimenting with larger and smaller migration rates in the following. What do you notice about the allele frequencies? (lines tend to be less bumpy and move together when migration is high)
+
+```{r}
+sim_freqs(N = 1000, demes = 5, mig_rate = 0.01)
+```
+
+Lets look at what happens to Fst when we include migration. What happens when you increase/decrease the migration rate?
+
+```{r}
+sim1 <- sim_freqs(N = 1000, demes = 10, t_out = seq(0, 365*20, 7), mig_rate = 1e-3,
+                  mut_rate = 1e-6, plot_on = FALSE)
+sim1$data %>%
+  select(-locus) %>%
+  group_by(time) %>%
+  summarise(p_mean = mean(freq),
+            p_var = popvar(freq),
+            Fst = p_var / (p_mean * (1 - p_mean))) %>%
+  ggplot() + theme_bw() +
+  geom_line(aes(x = time, y = Fst)) +
+  expand_limits(y = c(0, 1)) +
+  geom_hline(yintercept = 1 / (1 + 2*1e3*(1e-3 + 1e-6)), linetype = "dashed")
+```
+
+Theory tells us that the equilibrium level of Fst in this situation is given by 1/(1 + 2*N*(m + mu)). Does this result hold up this your simulations? (yes, on average). Note that migration rates are usually much larger than mutation rates, meaning we can often simplify this to 1/(1 + 2*N*m).
+
+Conclusion - at equilibrium, Fst reaches a level that is a balance between the strength of genetic drift (i.e. small population size) and migration. The higher the migration rate, the lower the value of Fst. This means we can use Fst to tell us something about the connectivity of populations. Small pairwise Fst tends to indicate highly connected populations and vice versa.
+
+Note, however, that these patterns take a very long time to build up. So we are not talking about the timescale of control programmes, but more of an evolutionary timescale.
+
+-------------------------
+
+# Analysis of DRC data {-}
+
+Load the DRC MIP data. This data is a slightly simplified version of that used in the NatComms paper.
+
+```{r, echo=FALSE, eval=FALSE}
+# Code to process raw data from DRC paper. This code block does not need to be run by the user.
+
+# read in raw data
+dat <- readRDS(url("https://github.com/bobverity/antimalarial_resistance_DRC/raw/master/source_data/biallelic_distances.rds"))
+
+# simplify
+dat$distance <- NULL
+dat$samples <- dat$samples %>%
+  select(ID, Country, ADM1NAME, Year, lat, long)
+names(dat$samples) <- c("ID", "Country", "Admin1_name", "Year", "Latitude", "Longitude")
+
+dat$loci <- dat$loci %>%
+  select(CHROM_NUMERIC, POS, REF, ALT, NEUTRAL, GEO) %>%
+  mutate(NEUTRAL = c("Neutral", "Non-neutral")[match(NEUTRAL, c("True", "False"))],
+         GEO = c("Geographic", "Non-geographic")[match(GEO, c("True", "False"))])
+names(dat$loci) <- c("CHROM", "POS", "REF", "ALT", "NEUTRAL", "GEO")
+
+# get unique lat-lon into clusters
+latlon <- interaction(round(dat$samples$Latitude, 2), round(dat$samples$Longitude, 2))
+dat$samples$Cluster <- as.factor(match(latlon, unique(latlon)))
+
+# save to file
+saveRDS(dat, file = "data/DRC_MIPs_biallelic_processed.rds")
+```
+
+Have a look at the data using the *MIPanalyzer* package.
+
+```{r}
+# load data
+MIP_data <- readRDS("data/DRC_MIPs_biallelic_processed.rds")
+
+# have a look at the data
+MIP_data
+
+head(MIP_data$samples)
+
+head(MIP_data$loci)
+```
+
+let's create a copy of the dataset that does not include any DRC samples:
+
+```{r}
+# filter samples
+MIP_data_noDRC <- MIPanalyzer::filter_samples(MIP_data, MIP_data$samples$Country != "DRC")
+
+MIP_data_noDRC
+```
+
+Now lets do PCA on the within-sample allele frequencies
+
+```{r}
+wsaf_impute <- MIPanalyzer::get_wsaf(MIP_data_noDRC, impute = TRUE, FUN = mean)
+pca <- MIPanalyzer::pca_wsaf(wsaf_impute)
+
+plot_df <- data.frame(PC1 = pca$x[,1],
+                      PC2 = pca$x[,2],
+                      Country = MIP_data_noDRC$samples$Country)
+
+ggplot(plot_df) + theme_bw() +
+  geom_point(aes(x = PC1, y = PC2, color = Country))
+```
+
+We see well-separated clusters, which makes sense geographicall. Now let's repeat the process using all samples including those from DRC.
+
+```{r}
+wsaf_impute <- MIPanalyzer::get_wsaf(MIP_data, impute = TRUE, FUN = mean)
+pca <- MIPanalyzer::pca_wsaf(wsaf_impute)
+
+plot_df <- data.frame(PC1 = pca$x[,1],
+                      PC2 = pca$x[,2],
+                      Country = MIP_data$samples$Country)
+
+ggplot(plot_df) + theme_bw() +
+  geom_point(aes(x = PC1, y = PC2, color = Country))
+```
+
+The DRC points connect the other points. This suggests that there is more of a spatial continuum of allele frequencies.
+
+We can plot the contributions that each locus makes to this PCA. Starting with PC1, what do you notice about the balance of geographically informative vs. non-informative SNPs? (the pattern is mostly driven by geographically informative SNPs). What does this suggest? (the primary factor driving this PCA is spatial location)
+
+```{r}
+# plot component 1
+MIPanalyzer::plot_pca_contribution(pca, component = 1, chrom = MIP_data$loci$CHROM, pos = MIP_data$loci$POS,
+                                   locus_type = MIP_data$loci$GEO)
+```
+
+Now repeat the process with PC2. What do you notice about where these loci are on the genome? (they are all in one or two places). What genes are at these positions? (pfcrt on chrom7. Small peak at dhps on chromosome 8)
+
+```{r}
+# plot component 2
+MIPanalyzer::plot_pca_contribution(pca, component = 2, chrom = MIP_data$loci$CHROM, pos = MIP_data$loci$POS,
+                                   locus_type = MIP_data$loci$GEO)
 ```
 
 
+-------------------------
 
-# Calculating Allele Frequencies from VCF data
-- Define allele frequencies
-- Explain 
-- Recycle code from drug resistance practical 
+# Inferring population structure using *rmaverick* {-}
+
+Load barcode data from Amy Bei's 2018 paper. This data has already been filtered to remove the two Thies samples, and to order in terms of date (2001-2002 vs. 2014) and location (Dielmo and Ndiop)
+
+```{r, echo=FALSE, eval=FALSE}
+# code not run - this is how I get the raw data from SIMPLEGEN and process it
+load("/Users/rverity/Dropbox/Bob/Work/My Programs/Simulation/SIMPLEGEN/data/Bei_2018.RData")
+Bei_2018_processed <- Bei_2018
+
+Bei_2018_processed$barcodes <- Bei_2018_processed$barcodes %>%
+  filter(Location %in% c("Dielmo", "Ndiop")) %>%
+  mutate(Date = as.Date(Date, format = "%m/%d/%Y"),
+         Date_level = (Date > as.Date("2010-01-01")) + 1) %>%
+  arrange(Date_level, Location, Date) %>%
+  select(-Haplotype, -Date_level, -`Sample ID`, -COI) %>%
+  as.data.frame()
+
+Bei_2018_processed$EIR <- as.data.frame(Bei_2018_processed$EIR)
+
+Bei_2018_processed$SNP_locations <- as.data.frame(Bei_2018_processed$SNP_locations)
+
+save(Bei_2018_processed, file = "data/Bei_2018_processed.RData")
+```
+
+Give a snapshot of the data, which includes measures of transmission intensity in the two timepoints and regions
 
 ```{r}
+load("data/Bei_2018_processed.RData")
 
+head(Bei_2018_processed$EIR)
 
+head(Bei_2018_processed$barcodes)
+
+head(Bei_2018_processed$SNP_locations)
 ```
-# Calculating FST
-- Define FST
-- Explain how and when it is used
-- recycle code from Namibia? But not in VCF format
+
+Some data processing
 
 ```{r}
+# filter out polygenomics
+mav_data <- Bei_2018_processed$barcodes %>%
+  filter(`M/P genomic` == "M")
 
+# convert genotype calls to numeric
+for (i in 8:31) {
+  mav_data[,i] <- match(mav_data[,i], c("A", "C", "T", "G"))
+}
 
+head(mav_data)
 ```
 
-# Using PCA / PCoA to identify population structure
-
-
-
+Load the data into *rmaverick*, and make a first model set. Print the project to check everything looks as planned (25 samples, 24 loci etc.)
 
 ```{r}
+myproj <- rmaverick::mavproject() %>%
+  rmaverick::bind_data(df = mav_data, ID_col = 1, data_cols = 8:31, ploidy = 1) %>%
+  rmaverick::new_set(name = "no admixture model", admix_on = FALSE)
 
-
+myproj
 ```
-#STRUCTURE / rmaverick
 
-
+Run MCMC. Users should run this with pb_markdown = FALSE.
 
 ```{r}
-
+myproj <- rmaverick::run_mcmc(myproj, K = 1:8, burnin = 1e3, samples = 1e3,
+                              rungs = 10, GTI_pow = 1.5, pb_markdown =  TRUE)
 
 ```
-#Tests for  isolation by distance (e.g. Rousset’s method, Mantel test)
 
+Some MCMC diagnostic checks. First, check that coupling rates are above 0. Do this for every value of K from 2 to the max value explored.
 
 ```{r}
-
-
+rmaverick:::plot_mc_acceptance(myproj, K = 8)
 ```
+
+Now check what the program things about the best value of K. In this case, values around 3-5 are reasonably likely
+
+```{r}
+rmaverick::plot_logevidence_K(myproj)
+rmaverick::plot_posterior_K(myproj)
+```
+
+Produce Structure plot. Add vertical lines to break up into the following groups:
+1. Dielmo 2001-2001
+2. Ndiop  2001-2002
+1. Dielmo 2014
+2. Ndiop  2014
+
+```{r}
+rmaverick::plot_qmatrix(myproj, K = 3:5) +
+  geom_vline(xintercept = c(4, 10, 16) + 0.5, size = 1)
+```
+
+Notive that the later samples are (mostly) clearly allocated to one or other population with high probability. These essentially represent clonal lineages. We can see that groups 2,3,4 are present in Dielmo in 2014, and in Ndiop we additionally have group 1.
+Comparing this to the earlier time point, samples are far more ambigious in their allocation. They look a bit like some of these clonal lineages, but it's not clear cut, probably because there is some additional variation. Interestingly, group 4 dominates in Ndiop in 2001-2002. This lineage is almost completely lost by the later sampling point.
+Overall, we can see evidence of increasing population structure over time. Compare this with the EIR values - what do you notice? (lower transmission later in time, therefore increasing differentiation and population structure).
+
+-------------------------
