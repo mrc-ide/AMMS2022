@@ -1,5 +1,5 @@
 ---
-title: "Pratique AMMS : Introduction à la puissance statistique" 
+title: "Activité Pratique AMMS : Introduction à la puissance statistique" 
 author: "Bob Verity"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output: 
@@ -42,7 +42,7 @@ end_button <- function(ID) {
 }
 ```
 
-# Dépendances pour Pratique {-}
+# Dépendances pour Activité Pratique {-}
 
 Veuillez copier et coller le morceau de code ci-dessous dans son intégralité sur votre console pour télécharger les bibliothèques de packages R nécessaires à cette pratique. Si vous rencontrez des difficultés pour installer l'un des packages R, veuillez demander à un instructeur un lecteur flash préchargé.
 
@@ -72,13 +72,13 @@ Très souvent en surveillance moléculaire nous sommes intéressés à répondre
 - L'utilisation des moustiquaires a-t-elle eu un impact sur la diversité génétique des parasites ?
 - L'incidence des résultats de TDR faussement négatifs est-elle plus élevée dans une population que dans une autre ?
 
-Nous pourrions simplement mesurer ces quantités et rapporter nos résultats, ce qui est parfois appelé **statistiques descriptives**, mais souvent nous voulons plus que cela. Nous voulons pouvoir "prouver" qu'un effet est réel. Cela signifie tenir compte du rôle du hasard dans nos résultats par le biais de **tests statistiques**, parfois appelés **tests d'hypothèse nulle**. S'il est très peu probable que nos résultats observés se produisent par hasard, cela nous donne plus de confiance qu'un effet est réel. Cela ne "prouve" pas tout à fait que l'effet est réel, car nous aurions toujours pu être très chanceux ou malchanceux, mais cela contrôle au moins la fréquence à laquelle nous arrivons à la mauvaise conclusion.
+Nous pouvons simplement mesurer ces quantités et rapporter nos résultats, ce qui est parfois appelé **statistiques descriptives**, mais souvent nous voulons plus que cela. Nous voulons pouvoir "prouver" qu'un effet est réel. Cela signifie d'utiliser des **testes statistiques** , parfois appelés **tests d'hypothèse nulle**, pour tenir compte du rôle du hasard dans nos résultats. S'il est très peu probable que nos résultats observés se produisent par hasard, cela nous donne plus de confiance qu'un effet est réel. Cela ne "prouve" pas tout à fait que l'effet est réel, car nous aurions toujours pu être très chanceux ou malchanceux, mais cela contrôle au moins la fréquence à laquelle nous arrivons à la mauvaise conclusion.
 
-Une fois que nous avons une bonne maîtrise des tests statistiques, la prochaine idée cruciale à saisir est la **puissance statistique**. Nous pouvons considérer l'**analyse de puissance** comme une sorte de test statistique que nous effectuons avant de voir des données. Au lieu de cela, nous faisons des hypothèses sur la force de l'effet dans le monde réel (par exemple, la différence de prévalence de la résistance aux médicaments) et la taille de notre échantillon, et nous calculons * exactement * la probabilité que nous ayons de détecter cet effet réel avec notre signification choisie test. Si la puissance est faible, nous risquons de manquer des résultats intéressants même s'ils sont là, car notre test statistique ne peut pas exclure la possibilité que nos résultats soient dus au pur hasard. Il est donc extrêmement important que nous effectuions une analyse de puissance avant d'entreprendre tout essai ou enquête sérieux pour nous assurer que nous avons une chance décente de succès.
+Une fois que nous avons une bonne maîtrise des tests statistiques, la prochaine idée cruciale à saisir est la **puissance statistique**. Nous pouvons considérer l'**analyse de puissance** comme une sorte de test statistique que nous effectuons avant de voir des données. Au lieu de cela, nous formons des hypothèses sur la force de l'effet dans le monde réel (par exemple, la différence de prévalence de la résistance aux médicaments) et la taille de notre échantillon, et nous calculons * exactement * la probabilité que nous avons de détecter cet effet réel avec notre test statistique de choix. Si la puissance est faible, nous risquons de manquer des résultats intéressants même s'ils sont là, car notre test statistique ne peut pas exclure la possibilité que nos résultats soient dus au pur hasard. Il est donc extrêmement important que nous effectuions une analyse de puissance avant d'entreprendre tout essai ou enquête sérieux pour nous assurer que nous avons une chance décente de succès.
 
 ### Aperçu des données {-}
 
-Pour cette pratique, nous travaillerons entièrement avec des ensembles de données inventés ou simulés. Ceux-ci nous permettront de nous familiariser avec les concepts de base, que nous pourrons ensuite appliquer à des ensembles de données du monde réel à un stade ultérieur.
+Pour cette activité pratique, nous travaillerons entièrement avec des ensembles de données inventés ou simulés. Ceux-ci nous permettront de nous familiariser avec les concepts de base, que nous pourrons ensuite appliquer à des ensembles de données du monde réel au prochain stade d'analyse.
 
 ### Objectifs pratiques {-}
 
@@ -89,7 +89,7 @@ Pour cette pratique, nous travaillerons entièrement avec des ensembles de donn�
 - Calculer la puissance statistique de plusieurs tests
 - Interpréter les courbes de puissance et calculer les tailles d'échantillon optimales
 - Ajuster la taille des échantillons pour l'abandon attendu
-- Commenter les questions d'études sous-alimentées et suralimentées
+- Faire commentaire à propos des problèmes de puissance dans les études
 - Concevoir une étude simple, en tenant compte de considérations statistiques et logistiques
 
 
@@ -106,7 +106,7 @@ save(COI_control, file = "data/COI_control.RData")
 save(COI_nets, file = "data/COI_nets.RData")
 ```
 
-Il vous a été demandé d'analyser certaines données sur la complexité de l'infection (COI) dans deux populations, dont l'une a connu une mise à l'échelle rapide des moustiquaires et l'autre agissant comme témoin. Le COI a tendance à être plus élevé dans les populations à forte intensité de transmission, donc l'hypothèse ici est que les moustiquaires auront provoqué une baisse du COI en moyenne par rapport à la population témoin.
+On vous a  demandé d'analyser certaines données sur la complexité de l'infection (COI) dans deux populations, dont l'une a connu une mise à l'échelle rapide des moustiquaires et l'autre agissant comme controle. Le COI a tendance à être plus élevé dans les populations à forte intensité de transmission, donc l'hypothèse ici est que les moustiquaires auront provoqué, en moyenne, une baisse du COI par rapport à la population controle.
 
 Chargeons les données COI et examinons rapidement la distribution:
 
@@ -119,14 +119,14 @@ COI_control
 COI_nets
 ```
 
-Nous pouvons voir que nous n'avons que 10 échantillons de chaque population, et il est difficile de dire en regardant si le COI est plus élevé dans une population ou dans l'autre.
+Nous pouvons voir que nous n'avons que 10 échantillons de chaque population, et il est difficile voir a l'oeille nue si le COI est plus élevé dans une population ou dans l'autre.
 
 
-**Q1.** Quel est le COI moyen dans chaque population ? Quelle est la variance dans chaque population ? La moyenne est-elle supérieure ou inférieure dans la population disposant de moustiquaires ?
+**Q1.** Quel est le COI moyen dans chaque population ? Quelle est la variance dans chaque population ? La moyenne est-elle supérieure ou inférieure dans la population qui a des moustiquaires ?
 
 `r begin_button(1)`
 
-**A1.** Moyennes et variances indiquées ci-dessous. La moyenne est légèrement supérieure dans le groupe témoin.
+**A1.** Moyennes et variances indiquées ci-dessous. La moyenne est légèrement supérieure dans le groupe controle.
 
 ```{r, results='hold', class.source = "fold-show"}
 # get mean and variance of control population
@@ -142,16 +142,16 @@ var(COI_nets)
 `r end_button()`
 `r hrule()`
 
-Le COI moyen dans l'échantillon de contrôle est de 2,1. Il s'agit de notre meilleure *estimation* du COI moyen dans la *population* témoin, mais nous ne serions pas du tout surpris si la valeur de la population différait légèrement de 2,1. Par exemple, il se peut que le COI moyen dans la population soit de 2,0, et il se trouve que nous avons échantillonné par hasard des individus avec des COI légèrement plus élevés.
+Le COI moyen dans l'échantillon de contrôle est de 2,1. Il s'agit de notre meilleure *estimation* du COI moyen dans la *population* controle, mais nous ne serions pas du tout surpris si la valeur de la population différait légèrement de 2,1. Par exemple, il se peut que le COI moyen dans la population soit de 2,0, et il se trouve que nous avons échantillonné par hasard des individus avec des COI légèrement plus élevés.
 
-Nous pouvons représenter notre incertitude dans l'estimation moyenne par l'*erreur standard*. La formule de l'erreur type est :
+Nous pouvons représenter notre incertitude dans l'estimation moyenne par l'*erreur standarde*. La formule de l'erreur standarde est :
 
 $SE = \sqrt{\frac{s^2}{n}}$
 
 où $s^2$ est la variance de l'échantillon et $n$ est la taille de l'échantillon.
 
 
-**Q2.** Quelle est l'erreur type de la moyenne pour la population témoin ? Quelle est l'erreur type de la moyenne pour la population de moustiquaires ?
+**Q2.** Quelle est l'erreur standarde de la moyenne pour la population témoin ? Quelle est l'erreure standarde de la moyenne pour la population avec des moustiquaires ?
 
 `r begin_button(2)`
 
@@ -169,14 +169,14 @@ SE_nets
 `r end_button()`
 `r hrule()`
 
-Nous pouvons utiliser l'erreur standard pour calculer un *intervalle de confiance à 95 %*. L'interprétation d'un intervalle de confiance sous une définition fréquentiste peut prêter à confusion. Il indique que si nous devions prélever des échantillons de la même population plusieurs fois (ou répéter cette "expérience" plusieurs fois), nous nous attendrions à ce que 95 % de nos intervalles de confiance calculés contiennent la moyenne de la population. Une interprétation plus directe est que nous sommes sûrs à _95 % que notre intervalle contient la moyenne de la population_. Les intervalles de confiance (IC) sont un moyen utile de visualiser l'incertitude dans une estimation. La formule pour un IC à 95 % (normal) est la suivante :
+Nous pouvons utiliser l'erreur standard pour calculer une *intervalle de confiance à 95 %*. L'interprétation d'une intervalle de confiance sous une définition fréquentiste peut prêter à confusion. Il indique que si nous devions prélever des échantillons de la même population plusieurs fois (ou répéter cette "expérience" plusieurs fois), nous nous attendrions à ce que 95 % de nos intervalles de confiance calculés contiennent la moyenne de la population. Une interprétation plus directe est que nous sommes sûrs à _95 % que notre intervalle contient la moyenne de la population_. Les intervalles de confiance (IC) sont un moyen utile de visualiser l'incertitude dans une estimation. La formule pour une IC à 95 % (normal) est la suivante :
 
 $\bar{x} \pm 1,96 \times SE$
 
 où $\bar{x}$ est la moyenne de l'échantillon.
 
 
-**Q3.** Quel est l'IC à 95 % pour la population témoin ? Quel est l'IC à 95 % pour la population des moustiquaires ?
+**Q3.** Quel est l'IC à 95 % pour la population controle ? Quel est l'IC à 95 % pour la population avec moustiquaires ?
 
 `r begin_button(3)`
 
@@ -193,7 +193,7 @@ mean(COI_nets) + c(-1.96, 1.96)*SE_nets
 `r hrule()`
 
 
-**Q4.** Les IC des deux populations se chevauchent-ils ? Qu'est-ce que cela vous dit sur la confiance que nous accordons aux différences entre les moyennes ?
+**Q4.** Les IC des deux populations se chevauchent-ils ? Qu'est-ce que cela vous dit a propos de la confiance que nous accordons aux différences entre les moyennes ?
 
 `r begin_button(4)`
 
@@ -205,7 +205,7 @@ mean(COI_nets) + c(-1.96, 1.96)*SE_nets
 
 Nous comparerons les deux moyennes à l'aide du test t de Student à deux échantillons. Nous avons le même nombre d'échantillons dans les deux groupes, ce qui facilite un peu la vie, et nous supposerons également que les variances sont les mêmes entre les groupes.
 
-La formule de la statistique de test est la suivante :
+La formule de la statistique est la suivante :
 
 $t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\frac{\hat{s}^{2}_1 + \hat{s}^{2}_2}{ n}}}$
 
@@ -263,7 +263,7 @@ get_t_stat(COI_control, COI_nets)
 `r hrule()`
 
 
-Rappelez-vous de la conférence que chaque statistique de test a une distribution connue sous l'hypothèse nulle. Dans ce cas, la distribution s'appelle la distribution t (ce qui est logique, c'est un test t après tout). Cette distribution a un paramètre "degrés de liberté", qui pour ce test est donné par la formule $2n-2$. Pour $n=10$, cela donne une valeur de 18. Le graphique suivant montre la distribution t avec 18 degrés de liberté, et avec notre valeur observée indiquée par une flèche :
+Rappelez-vous que chaque statistique de test a une distribution connue sous l'hypothèse nulle. Dans ce cas, la distribution s'appelle la distribution t (ce qui est logique, c'est un test t après tout). Cette distribution a un paramètre "degrés de liberté", qui pour ce test est donné par la formule $2n-2$. Pour $n=10$, cela donne une valeur de 18. Le graphique suivant montre la distribution t avec 18 degrés de liberté, et avec notre valeur observée indiquée par une flèche :
 
 ```{r, echo=FALSE, out.width="60%"}
 t_obs <- get_t_stat(COI_control, COI_nets)
@@ -287,11 +287,11 @@ data.frame(x <- seq(-5, 5, l = 201)) %>%
   xlab("t-statistic") + ylab("Probability")
 ```
 
-**Q7.** Votre valeur observée de la statistique de test se situe-t-elle dans le corps de la distribution ou dans les queues ? Qu'est-ce que cela vous dit sur la probabilité que cette valeur soit sous l'hypothèse nulle d'aucune différence de COI entre les groupes ?
+**Q7.** Votre valeur observée de la statistique  se situe-t-elle dans le corps de la distribution ou dans les queues ? Qu'est-ce que cela vous dit a propos de la probabilité d'observer cette valeur si l'hypothèse nulle, d'aucune différence de COI entre les groupes, est vraie ?
 
 `r begin_button(7)`
 
-**A7.** La valeur se trouve dans le corps de la distribution. Cela signifie que nous sommes assez susceptibles de voir une valeur aussi extrême que celle-ci si l'hypothèse nulle est vraie.
+**A7.** La valeur se trouve dans le corps de la distribution. Cela signifie que l'observation d'une valeur aussi extrême que celle-ci si l'hypothèse nulle est vraie est probable.
 
 `r end_button()`
 `r hrule()`
@@ -330,7 +330,7 @@ t_stat <- get_t_stat(COI_control, COI_nets)
 
 `r begin_button(9)`
 
-**A9.** La valeur p est d'environ 0,37, ce qui est supérieur à 0,05, donc non significatif au niveau de 5 %. Sur la base de cette valeur, nous ne pouvons pas rejeter l'hypothèse nulle selon laquelle il n'y a pas de différence entre le COI dans les populations de contrôle et de moustiquaires.
+**A9.** La valeur p est d'environ 0,37, ce qui est supérieur à 0,05, donc non significatif au niveau de 5 %. Sur la base de cette valeur, nous ne pouvons pas rejeter l'hypothèse nulle selon laquelle il n'y a pas de différence entre le COI dans les populations avec et sans moustiquaires.
 
 `r end_button()`
 `r hrule()`
@@ -346,7 +346,7 @@ t.test(COI_control, COI_nets, var.equal = TRUE)
 
 ## Analyse de puissance et calcul de la taille de l'échantillon {-}
 
-Avant de réaliser une étude comme celle ci-dessus, il est bon d'effectuer une analyse de puissance. Cela peut nous indiquer la chance de trouver quelque chose d'intéressant s'il est vraiment là. Plus exactement, cela nous indique la chance de rejeter correctement l'hypothèse nulle compte tenu de certaines hypothèses sur la taille de l'effet et la taille de l'échantillon.
+Ayant réaliser une étude comme celle ci-dessus, c'est une bonne iddée d'effectuer une analyse de puissance. Cela peut nous indiquer la chance de trouver quelque chose d'intéressant s'il est vraiment là. Plus exactement, cela nous indique la chance de rejeter correctement l'hypothèse nulle en tennant compte de la taille de l'effet et la taille de l'échantillon.
 
 Ci-dessus, nous avons utilisé cette formule pour la statistique du test t :
 
