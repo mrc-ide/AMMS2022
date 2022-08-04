@@ -64,19 +64,20 @@ Please set *your* R working director so that you are in the `AMMS/COI` directory
 
 # Introduction {.unnumbered}
 ## Useful Definitions {.unnumbered}
-  + **Definition:** _An allele is the identity of a particular genetic locus or sequence that is inherited between parents and offspring._
-  + **Definition:** _An allele is considered to be biallelic if it only has two states in a population (i.e. a biallelic SNP can either be A or T in the population)._
   + **Definition:** _A locus is a fixed position on a chromosome where a particular genetic marker is located._
-  + **Definition:** _Sequencing data consists of sequences of DNA obtained from a DNA sequencing reaction_
-  + **Definition:** _Complexity of infection, or multiplicity of infection, is a measure of the number of different malaria parasite clones in an individual sample._
-  + **Definition:** _A monoclonal malaria infection contains one parasite strain, or "genome" (complexity of infection [COI] = 1), while a polyclonal infection contains more than one parasite strain (COI > 1)._
-  + **Definition**: _Population Level Heterozygosity or Expected Heterozygosity ($H_E$): is a measure of the genetic diversity of the different clones in a population, at a particular genetic locus._
+  + **Definition:** _An allele is the identity of a particular genetic locus or sequence that is inherited between parents and offspring._
   + **Definition:** _Single-nucleotide polymorphism (SNP). Forms of genetic variation that involve only changes to only a single nucleotide in the geneome are called *single-nucleotide polymorphisms*. *Polymorphism* is latin for 'multiple forms'; in this case meaning that at this position you may observe different nucleotides in different samples._
-
+  + **Definition:** _An allele is considered to be biallelic if it only has two states in a population (i.e. a biallelic SNP can either be A or T in the population)._
+  + **Definition:** _Sequencing data consists of sequences of DNA obtained from a DNA sequencing reaction._
+  + **Definition:** _Complexity of infection (COI), or equivalently multiplicity of infection, is an integer-valued statistic giving the number of gebnetically distict malaria parasite clones in an individual sample._
+  + **Definition:** _A monoclonal malaria infection contains one parasite strain, or "genome" (COI = 1), while a polyclonal infection contains more than one parasite strain (COI > 1)._
+  + **Definition**: _Heterozygosity ($H$). For a given genetic locus, heterozygosity is a measure of the genetic diversity of samples across a population._
 
 
 ## Quick review of COI {.unnumbered}
-Complexity of infection (also know as multiplicity of infection) is the number of distinct clones, or parasite strains, that are within an individual. If there is only a single clone, the host is assumed to have a monoclonal infection. If there are more than one clones, or parasite strains, the host is assumed to have a polyclonal infection. Polyclonal infections result through two pathways: (1) superinfection and (2) contransmission. _Superinfection_ occurs when an individual is bit by multiple mosquitoes, each carrying distinct clones. _Cotransmission_ occurs when a single mosquito is carrying more than one clone and bites, and transmits, multiple clones to the individual concurrently.    
+Complexity of infection (also known as multiplicity of infection) is the number of distinct parasite clones, or parasite strains, that are within an individual sample. If there is only a single clone, the host is said to have a monoclonal infection. If there is more than one clone, the sample is said to be polyclonal.
+<br>
+Polyclonal infections result through two pathways: (1) superinfection and (2) contransmission. _Superinfection_ occurs when an individual is bit by multiple mosquitoes, each carrying distinct clones. _Cotransmission_ occurs when a single mosquito is carrying more than one clone and bites, and transmits, multiple clones to the individual concurrently.    
 <br>
 There are serveral motheds for calculating COI. In this practical we will explore two approaches: THEREALMcCOIL, which estimates COI based on the number of heterozygous sites across a set of single-nucleotide polymorphisms (SNPs); and Fws, a statistic for evaluating the genetic complexity within a sample, relative to its population of origin.
 
@@ -86,7 +87,7 @@ By the end of this practical, you should be able to do the following:
   + Extract and transform it, in preparation for COI estimation  
   + Calculate *p*opulation-*l*evel *a*lternative allele *f*requencie*s* (PLAFs) for a set of SNPs  
   + Run THEREALMcCOIL from R  
-  + Compute Fws  
+  + Compute Fws
 
 Let's get started!
 
@@ -132,7 +133,7 @@ Using this function, answer the following questions:
 
 `r begin_button(3)`
 
-**A3:** _No. By chance you can observe all reference or all alterative alleles at every site (i.e. all heads or tails)._
+**A3:** _No. By chance you can observe all reference or all alterative alleles at every site (i.e. all heads or tails for each series of coin flips)._
 
 `r end_button()`
 
@@ -140,7 +141,7 @@ Using this function, answer the following questions:
 
 `r begin_button(4)`
 
-**A4:** _For clonal samples it has no effect. For polyclonal infections, it increases the likelihood of observing a heterozygous SNPs. This reduces the likelihood that a COI>1 sample will, by chance, contain all homozygous sites._
+**A4:** _For clonal samples it has no effect. For polyclonal infections, it increases the likelihood of observing heterozygous SNPs. This reduces the likelihood that a COI>1 sample will, by chance, contain all homozygous sites._
 
 `r end_button()`
 
@@ -151,7 +152,6 @@ Using this function, answer the following questions:
 **A5:** _If the sequencing error is random, it will spuriously increase the number of heterozygous sites. This in turn will lead to overestimates of COI._
 
 `r end_button()`
-
 
 Great work! Now let's get to the real genetic data!
 
@@ -230,25 +230,43 @@ combined_long <- dplyr::bind_rows(DRC_long, VN_long) %>%
   dplyr::select(-c("Key"))
 ```
 
-The `vcfR` package extracts genotype information in character format, such that homozygous reference is "0/0", heterozygous is "0/1", and homozygous alternative is "1/1". For most analyses we want to convert these character values to numbers:
+The `vcfR` package extracts genotype information in character format, such that homozygous reference is "0/0", heterozygous is "0/1", and homozygous alternative is "1/1". For most analyses we want to convert these character values to numbers. In particular, we want to convert "0/0" to 0, "0/1" to 0.5, and "1/1" to 1.0.
+
+**Q111:** Using the `tidyverse`, convert "0/0" to 0, "0/1" to 0.5, "1/1" to 1. Hint: the command to explore is `dplyr::case_when()`.
+
+`r begin_button(111)`
+
+**A111:** 
 
 ```{r}
 
-# extract GT information for every sample and loci
 combined_long <- combined_long %>% 
-  # lets make some new variables
+  # use `mutate()` to add a new column
   dplyr::mutate(
-    # need to change the GT character to a numeric for maths
     gt = dplyr::case_when(gt_GT == "0/0" ~ 0,
                           gt_GT == "0/1" ~ 0.5,
-                          gt_GT == "1/1" ~ 1)
+                          gt_GT == "1/1" ~ 1)  # change `gt_GT` column to `gt`
   )
 
 ```
 
+`r end_button()`
+
 
 ### Exploring population-level allele frequencies (PLAF)
-Next, we will look at the population level allele frequencies (PLAF) between the DRC and VN. Population-level allele frequencies are calculated from the genotype calls across individuals per loci. Here, we will assume a diploid organism (an assumption made for convenience), and calculate homozygous referent calls, heterozygous, and homozygous altenrative calls as contributing 0, 1, 2 alleles to our overall PLAF calculation. Calculate the mean PLAF for the DRC and VN and compare them.
+Next, we will look at the population-level allele frequencies (PLAF) between the DRC and VN. Population-level allele frequencies are calculated from the genotype calls across individuals per loci. In particular, they can be calculated with the formula
+
+$$ PLAF = \frac{n_{alt}}{n_{ref} + n_{alt}}, $$
+
+where $n_alt$ and $n_ref$ are the number of alternative and number of reference alleles observed across the entire population, respectively. 
+
+In the case of malaria, we do not precisely know the number of alleles because we don't know COI! Instead, we will assume a diploid organism (an assumption made for convenience).
+
+**Q112:** Calculate the mean PLAF for the DRC and VN.
+
+`r begin_button(112)`
+
+**A112:** 
 
 ```{r}
 
@@ -261,7 +279,9 @@ plaf <- combined_long %>%
 
 ```
 
-Visualise the PLAF distribution.
+`r end_button()`
+
+Visualise the PLAF distribution for each country.
 
 ```{r}
 
