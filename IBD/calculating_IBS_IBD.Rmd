@@ -138,7 +138,6 @@ ad <- vcfR::extract.gt(vcf, element = "AD", as.numeric = T)
 vcfR::heatmap.bp(ad)
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 _**Conceptual Question 1:** Is above plot consistent w/ a high quality VCF? What are some questionable features?_
@@ -294,7 +293,6 @@ simpleIBS(vcfRobj = vcf, smpl1name = "A1", smpl2name = "D1")
 
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 ### Run Package IBS
@@ -321,7 +319,6 @@ ibs_long <- broom::tidy(as.dist(ibs)) %>%
   magrittr::set_colnames(c("p1", "p2", "ibsdist"))
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 It is always good practice to explore our results. Let's make a boxplot to explore the distribution of our calculated IBS results. 
@@ -351,7 +348,6 @@ ibs_long %>%
         axis.ticks.x = element_blank())
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 _**Conceptual Question 4:** Describe the distribution. Is this what you expected?_
@@ -396,7 +392,6 @@ ibd_mle_long <- broom::tidy(as.dist(t(ibd$mle))) %>%  # note, mipanalyzer return
   magrittr::set_colnames(c("p1", "p2", "malecotf"))
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 After generating our new results, we always explore them! <br>
@@ -416,7 +411,6 @@ ibd_mle_long %>%
 
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 
@@ -424,7 +418,6 @@ _**Conceptual Question 5:** Describe the MLE distribution. Is this what you expe
 `r begin_button(105)`
 _**Conceptual Answer 5:**_ The distribution is centered over approximately 0-0.1, suggesting that most pairs have very little IBD. However, there are a few pairs with high levels of IBD. 
 `r end_button()`
-`r hrule()`
 <br> 
 <br>
 
@@ -459,7 +452,6 @@ wsaf <- altad/dp
 colnames(wsaf) <- colnames(vcf@gt)[2:ncol(vcf@gt)]
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 _**Coding Question 9, part 2**_: In order to convert this dataframe into a "`hmmIBD` compliant dataframe, first, add the chromosome and position to your wsaf matrix (as the first and second columns respectively) and name it `gtmat`. Then tidy your "wide" matrix to "long" format excluding the chromosome and position (*i.e.* we want a dataframe with chromosome, position, sample, wsaf as our columns) with the function: `tidyr::pivot_longer(., cols = !c("chrom", "pos"))`. We are now going to coerce are WSAF calculations into homozygous genotype calls using rounding: `gthmm = round(value, 0)`. In addition, make sure to drop the `value` column (now redundant) and for `hmmIBD` liftover the chromosome names to integers: (`chrom = 1)`. In a turn of events, we will now make our data "wide" from long and write out this new table to your local drive for `hmmIBD` using the functions: `tidyr::pivot_wider(data = ., names_from = "name", values_from = "gthmm")` and `readr::write_tsv(x = gtmat, file = "data/gt_matrix_for_hmmIBD.txt", col_names = T)`, respectively. 
@@ -480,7 +472,6 @@ readr::write_tsv(x = gtmat, file = "data/gt_matrix_for_hmmIBD.txt",
                  col_names = T)
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 _**Coding Question 10, part 3**_: Finally, using your `wsaf` matrix, calculate the population level allele frequencies for each locus using the following function: `altafvec <- rowMeans(wsaf, na.rm = T)`. Remember, this is the alternative allele frequency, and because we are dealing with biallelic sites, we can calculate the referent allele frequency as 1-alt and place this all in a dataframe. The dataframe needs a chromosome column (as a numeric/integer [`chrom = 1`]), a column for locus' basepair position, a referent allele frequency column, and an alternative allele frequency column. Write this table out to your local drive with the following path: `data/af_matrix_for_hmmIBD.txt`.
@@ -499,15 +490,12 @@ afmat <- dplyr::bind_cols("chrom" = vcfR::getCHROM(vcf),
 readr::write_tsv(afmat, file = "data/af_matrix_for_hmmIBD.txt", col_names = F)
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 Explore the [hmmIBD documentation](https://github.com/glipsnort/hmmIBD) for a justification of this munging that we did above and further clarification of the caveat below. 
 
 _**Caveat**: The `hmmIBD` algorithm assumes that all samples are monoclonal. As a result, it does not accept heterozygote calls natively. As a user, we have two options: (1) to set those heterozygote calls to missing (a conservative approach), or (2) make a strong assumption about what a heterozygote call means (an aggressive approach). Here, I have forced the samples to be monoclonal by estimating their within-sample allele frequencies and rounding to the nearest variant._
 
-<br>
-<br>
 <br>
 
 ##### Running hmmIBD {.unnumbered}
@@ -550,14 +538,12 @@ ibd_hmm_long %>%
 
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 _**Conceptual Question 6:** Describe the HMM distribution. Is this what you expected?_
 `r begin_button(106)`
 _**Conceptual Answer 6:**_ The distribution is centered over approximately 0-0.05, suggesting that most pairs have very little IBD. This suggests lower levels of relatedness than demonstrated in the MLE distribution above. Again, there are a few pairs with high levels of IBD. 
 `r end_button()`
-`r hrule()`
 <br> 
 <br>
 
@@ -586,14 +572,12 @@ dplyr::left_join(ibd_mle_long, ibd_hmm_long, by = c("p1", "p2")) %>%
 
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 _**Conceptual Question 7:** Why would these two results differ? Are there any differing assumptions made in the models?_
 `r begin_button(107)`
 _**Conceptual Answer 7:**_ Remember that `hmmIBD` assumes that samples are monoclonal. Therefore, heterozygote calls will break down IBD blocks rapidly under our simple "force" to monoclonal assumption.
 `r end_button()`
-`r hrule()`
 <br> 
 <br>
 
@@ -612,7 +596,6 @@ dplyr::left_join(ibs_long, ibd_hmm_long, by = c("p1", "p2")) %>%
 
 ```
 `r end_button()`
-`r hrule()`
 <br>
 
 _**Conceptual Question 8:** How do the estimates of IBS and IBD differ. What is the smallest value for IBS versus IBD? Why may these be different?_
@@ -631,7 +614,6 @@ ibd_hmm_long
 ```  
 If you are having computational trouble or time is a limiting factor, please see the `results/` directory, where you will be able to read in the results.
 
-<br>
 <br>
 <br>
 <br>
@@ -669,7 +651,6 @@ cowplot::ggdraw() +
 
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 _**Conceptual Question 9:** How would you describe this distribution? Would you expect this many unrelated samples? What about the proportion of highly related pairs in the tail of the distribution?_
@@ -678,7 +659,6 @@ _**Conceptual Question 9:** How would you describe this distribution? Would you 
 `r begin_button(109)`
 _**Conceptual Answer 9:**_ The distribution is similar to our boxplot above, demonstrating that there are a large number of unrelated to lowly-related pairs. This is to be expected in many populations, unless there are reasons for a large amount of inbreeding (see lecture: factors that affect relatedness). However, there is a "tail" with a few highly related pairs. This tail is of interest! 
 `r end_button()`
-`r hrule()`
 <br> 
 <br>
 
@@ -709,14 +689,12 @@ ibd_mle_long_mtdt <- dplyr::left_join(ibd_mle_long, mtdt_x, by = "p1") %>%
   rename_with(., ~gsub(".y", "_p2", .x, fixed = T))
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 _**Conceptual Question 10:** Describe your new dataframe._
 `r begin_button(110)`
 _**Conceptual Answer 10:**_ We have a tidy long dataframe that contains pairwise comparisons contrasting sample one (p1) and sample two (p2) with corresponding metadata: deme, coi, GPS coordinates.
 `r end_button()`
-`r hrule()`
 <br> 
 <br>  
 
@@ -740,21 +718,18 @@ ibd_mle_long_mtdt %>%
 
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 _**Conceptual Question 11:** Is there a correlation here between mean COI and within deme IBD?_
 `r begin_button(111)`
 _**Conceptual Answer 11:**_ No, but the lowest COI was associated with the greatest within deme IBD.
 `r end_button()`
-`r hrule()`
 <br> 
 <br>
 _**Conceptual Question 12:** Why did our expectation of the relationship of within-deme IBD and transmission intensity not match reality?_
 `r begin_button(112)`
 _**Conceptual Answer 12:**_ Our expectations do not always match realized data. There are also multiple confounding variables here, including: migration and incomplete sampling.
 `r end_button()`
-`r hrule()`
 <br> 
 <br>
 
@@ -788,7 +763,6 @@ ibd_mle_long_mtdt_dist$distance_cat <-
 
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 _**Coding Question 18, part 2**_: Using our newly created dataframe, `ibd_mle_long_mtdt_dist`, group by the `distance_cat` column created with the `cut` function above and calculate the following summaries (`summarise`): mean IBD, standard deviation IBD, standard error IBD, lower 95% CI for IBD, and upper 95% CI for IBD. You can review the power practical, part 1 for a refresher on these statistics.   
@@ -808,7 +782,6 @@ plotdat <- ibd_mle_long_mtdt_dist %>%
     L95CI = meanIBD - 1.96 * seIBD) 
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 
@@ -831,7 +804,6 @@ plotdat %>%
 
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 _**Conceptual Question 13:** How would you describe this relationship? Does it make sense?_
@@ -873,7 +845,6 @@ ibd_mle_long %>%
 
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 _**Coding Question 21**_: While that graph is interesting, it may be hard to interpret given all of the low-level relatedness connections. Let's prune those and keep only connections with IBD $\geq$ 0.1. Use the `dplyr::filter` function to perform this task. 
@@ -899,7 +870,6 @@ ibd_mle_long %>%
 
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 
@@ -972,7 +942,6 @@ withinpairs <- ibd_mle_long_mtdt %>%
   dplyr::filter(deme_p1 == deme_p2)
 ```
 `r end_button()`
-`r hrule()`
 <br> 
 
 _**Coding Question 23, part 2**_: We will now plot these dataframes. First make a map base using the `geom_sf` layer. Next add a layer for cluster locations using `geom_point(data = mtdtclst, aes(x = longnum, y = latnum)`. Now we will color in the demes that contain highly related pairs within: `geom_point(data = withinpairs, aes(x = longnum_p1, y = latnum_p1), color = "blue"`. Finally, we will add a connections between pairs across different demes from our highly related between pairs dataframe: `geom_curve(data = highbtwnpairs, aes(x = longnum_p1, y = latnum_p1, xend = longnum_p2, yend = latnum_p2, color = malecotf)`. Your plot contains both spatial and relatedness data in a easily communicated graph. Note, you can change the order of the layers in order to have either points or curves on top (remember, ggplot layers follow the order of the code). 
@@ -997,7 +966,6 @@ ggplot() +
 
 ```
 `r end_button()`
-`r hrule()`
 <br>
 _**Conceptual Question 15:** What can highly related pairs tell you? How do they relate to transmission events? Can you use them to estimate genetic corridors or evidence of gene flow? Do you think there is active transmission between the mainland and island (see original study hypothesis)?_
 <br>

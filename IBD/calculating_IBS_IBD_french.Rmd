@@ -210,9 +210,9 @@ gt %>%
 
 
 _**Question conceptuelle 2:** Reconnaissez-vous un schéma dans les appels hétérozygotes en ce qui concerne les dèmes? Quel est le rapport avec la leçon sur la polyclonalité d'hier?_
-`r bouton_commencement(102)`
+`r begin_button(102)`
 _**Réponse conceptuelle 2:**_ Les dèmes avec une intensité de transmission plus élevée ont plus d'appels hétérozygotes.
-`r bouton_fin()`
+`r end_button()`
 `r hrule()`
 <br>
 
@@ -814,7 +814,7 @@ plotdat <- ibd_mle_long_mtdt_dist %>%
 <br> 
 
 
-_**Coding Question 17, part 3**_: Using the `geom_pointrange` layer in ggplot, plot the mean IBD on the y-axis and the categorized GC distance on the x-axis. For the `geom_pointrange` aesthetics, you will need to specify: `y = meanIBD, ymin = L95CI, ymax = U95CI`. 
+_**Question de codage 17, partie3 **_: à l'aide de la couche "geom_pointrange" dans ggplot, tracez l'IBD moyen sur l'axe des y et la distance GC catégorisée sur l'axe des x. Pour l'esthétique `geom_pointrange`, vous devrez spécifier: `y = meanIBD, ymin = L95CI, ymax = U95CI`.
 
 `r begin_button(17)`
 ```{r}
@@ -836,21 +836,22 @@ plotdat %>%
 `r hrule()`
 <br> 
 
-_**Conceptual Question 13:** How would you describe this relationship? Does it make sense?_
+_**Question conceptuelle 13:** Comment décririez-vous cette relation ? Est-ce que ça fait du sens?_
 <br>
 `r begin_button(113)`
-_**Conceptual Answer 13:**_ IBD decays with increasing distance. This follows the concept of isolation by distance. 
+_**Réponse conceptuelle 13:**_ L'IBD se désintègre avec l'augmentation de la distance. Cela suit le concept d'isolement par la distance.
 `r end_button()`
 `r hrule()`
 <br> 
 <br> 
 
-### Network Analysis
-We can also use networks to determine the connectivity of our paired samples. Networks helps us visualize connections that we may not expect and are a useful tool for exploratory data analysis. Additionally, we can use [community detection algorithms](https://towardsdatascience.com/community-detection-algorithms-9bd8951e7dae) to explore which samples may "cluster" together based on relatedness. One way to conceptualize community detection algorithms is to consider that networks measure "popularity" and that samples that are "cliques" should cluster together. Alternatively, a sample may be "friends" with everyone and becomes very central or important to the network. These distinctions may be helpful to determine which demes are particularly connected and may be contributing to sink-source dynamics (see [Wesolowksi _et al._ 2018](https://pubmed.ncbi.nlm.nih.gov/30333020/) for further information on sink-source dynamics).
+### Analyse de réseau
+Nous pouvons également utiliser des réseaux pour déterminer la connectivité de nos échantillons appariés. Les réseaux nous aident à visualiser les connexions auxquelles nous ne nous attendons peut-être pas et constituent un outil utile pour l'analyse exploratoire des données. De plus, nous pouvons utiliser des [algorithmes de détection de communauté](https://towardsdatascience.com/community-detection-algorithms-9bd8951e7dae) pour déterminer quels échantillons peuvent se "regrouper" en fonction de leur parenté. Une façon de conceptualiser les algorithmes de détection de communauté est de considérer que les réseaux mesurent la "popularité" et que les échantillons qui sont des "cliques" devraient se regrouper. Alternativement, un échantillon peut être "ami" avec tout le monde et devenir très central ou important pour le réseau. Ces distinctions peuvent être utiles pour déterminer quels dèmes sont particulièrement connectés et peuvent contribuer à la dynamique puits-source (voir [Wesolowksi _et al._ 2018](https://pubmed.ncbi.nlm.nih.gov/30333020/) pour informations complémentaires sur la dynamique puits-source).
 <br>
-Read this STDHA [blog](http://sthda.com/english/articles/33-social-network-analysis/136-network-analysis-and-manipulation-using-r) networks and on community detection algorithms and use the R packages: [tidygraph](https://tidygraph.data-imaginist.com/index.html) and [ggraph](https://ggraph.data-imaginist.com/) to try to generate the figure below. 
+Lisez ce [blog] STDHA (http://sthda.com/english/articles/33-social-network-analysis/136-network-analysis-and-manipulation-using-r) réseaux et sur les algorithmes de détection de communauté et utilisez le Packages R: [tidygraph](https://tidygraph.data-imaginist.com/index.html) et [ggraph](https://ggraph.data-imaginist.com/) pour essayer de générer la figure ci-dessous.
 
-_**Coding Question 18**_: Use the `tidygraph::as_tbl_graph` function to convert our`ibd_mle_long` into an a `tbl_graph` for easier network analyses. Then calculate the compunity membership using `tidygraph::group_louvain(weights = malecotf)))` function and plot the resulting network with `ggraph::ggraph(layout = 'kk')`. Make sure to color in the nodes by community using the `geom_node_point` layer and proper aesthetic: `ggraph::geom_node_point(aes(color = community)`. 
+
+_**Question de codage 18**_: Utilisez la fonction `tidygraph::as_tbl_graph` pour convertir notre `ibd_mle_long` en un `tbl_graph` afin de faciliter les analyses de réseau. Calculez ensuite l'appartenance à la communauté en utilisant la fonction `tidygraph::group_louvain(weights = malecotf)))` et tracez le réseau résultant avec `ggraph::ggraph(layout = 'kk')`. Assurez-vous de colorer les nœuds par communauté en utilisant le calque `geom_node_point` et l'esthétique appropriée: `ggraph :: geom_node_point(aes(color = community)`.
 
 `r begin_button(18)`
 ```{r}
@@ -878,7 +879,7 @@ ibd_mle_long %>%
 `r hrule()`
 <br> 
 
-_**Coding Question 19**_: While that graph is interesting, it may be hard to interpret given all of the low-level relatedness connections. Let's prune those and keep only connections with IBD $\geq$ 0.1. Use the `dplyr::filter` function to perform this task. 
+_**Question de codage 19**_ : Bien que ce graphique soit intéressant, il peut être difficile à interpréter compte tenu de toutes les relations de faible niveau. Élaguons-les et ne gardons que les connexions avec IBD $\geq$ 0.1. Utilisez la fonction `dplyr::filter` pour effectuer cette tâche.
 `r begin_button(19)`
 ```{r}
 
@@ -905,15 +906,15 @@ ibd_mle_long %>%
 <br> 
 
 
-_**Conceptual Question 14:** What do you notice about the above network? Are there any isolated cliques? Are there any very "popular" samples?_
+_**Question conceptuelle 14:** Que remarquez-vous à propos du réseau ci-dessus? Existe-t-il des cliques isolées ? Existe-t-il des échantillons très "populaires"?_
 `r begin_button(114)`
-_**Conceptual Answer 14:**_ All demes appear to have some degree of connectivity - albeit some demes have lower connectivity than others. For example, Deme E seems to be relatively clustered/isolated relative to the other demes (but still does have connections to the mainland). 
+_**Réponse conceptuelle 14:**_ Tous les dèmes semblent avoir un certain degré de connectivité - bien que certains dèmes aient une connectivité plus faible que d'autres. Par exemple, Deme E semble être relativement regroupé / isolé par rapport aux autres dèmes (mais a toujours des liens avec le continent).
 `r end_button()`
 `r hrule()`
 <br> 
 
-## High Related Pairs
-Here, we will subset to highly related pairs, defined as pairs that are at least meiotic siblings (_i.e._ share half of their genome). We will then map these between deme connections to determine if there is evidence of genetic sharing between demes. In this section, we will practice layering multiple dataframes onto a single plot to generate a figure like below. 
+## Paires apparentées élevées
+Ici, nous allons subdiviser en paires hautement apparentées, définies comme des paires qui sont au moins des frères et sœurs méiotiques (_i.e._ partagent la moitié de leur génome). Nous cartographierons ensuite ces connexions entre les dèmes pour déterminer s'il existe des preuves de partage génétique entre les dèmes. Dans cette section, nous allons pratiquer la superposition de plusieurs dataframes sur un seul tracé pour générer une figure comme ci-dessous.
 ```{r, echo=F}
 simmap <- readRDS("data/sim_map_sf.RDS")
 mtdtclst <- mtdt %>%
@@ -950,7 +951,7 @@ ggplot() +
 ```
 
 
-_**Coding Question 20, part 1**_: Here we will set up our data for making the map/plot. Read in the simulated map with the following function: `readRDS("data/sim_map_sf.RDS")`. Then make a condensed version of the metadata that just contains one row of coordinates for each deme. Next, make a dataframe containing highly related pairs between demes by subsetting the `ibd_mle_long_mtdt` to at least meiotic siblings: `dplyr::filter(malecotf >= 0.25)` and by excluding pairs that are from the same deme: ` dplyr::filter(deme_p1 != deme_p2)`. Finally, create a dataframe of demes that contain highly related pairs by subsetting the `ibd_mle_long_mtdt` to at least meiotic siblings: `dplyr::filter(malecotf >= 0.25)` and by including only pairs that are from the same deme: ` dplyr::filter(deme_p1 == deme_p2)`. You know have four objects ready for plotting: (1) map, (2) cluster locations, (3) highly related between deme pairs, (4) high related within deme pairs. 
+_**Question de codage 20, partie 1**_: Ici, nous allons configurer nos données pour créer la carte/le tracé. Lire dans la carte simulée avec la fonction suivante : `readRDS("data/sim_map_sf.RDS")`. Créez ensuite une version condensée des métadonnées qui ne contient qu'une ligne de coordonnées pour chaque dème. Ensuite, créez une base de données contenant des paires hautement liées entre les dèmes en sous-définissant le `ibd_mle_long_mtdt` à au moins des frères et sœurs méiotiques: `dplyr::filter(malecotf >= 0,25)` et en excluant les paires qui proviennent du même dème: ` dplyr:: filtre(dème_p1 != dème_p2)`. Enfin, créez une base de données de dèmes contenant des paires hautement liées en sous-définissant `ibd_mle_long_mtdt` au moins sur les frères et sœurs méiotiques: `dplyr::filter(malecotf >= 0,25)` et en incluant uniquement les paires provenant du même dème: ` dplyr ::filter(dème_p1 == dème_p2)`. Vous savez que quatre objets sont prêts à être tracés: (1) carte, (2) emplacements de clusters, (3) fortement liés entre les paires de dèmes, (4) fortement liés au sein des paires de dèmes.
 
 `r begin_button(20)`
 ```{r}
@@ -977,7 +978,8 @@ withinpairs <- ibd_mle_long_mtdt %>%
 `r hrule()`
 <br> 
 
-_**Coding Question 21, part 2**_: We will now plot these dataframes. First make a map base using the `geom_sf` layer. Next add a layer for cluster locations using `geom_point(data = mtdtclst, aes(x = longnum, y = latnum)`. Now we will color in the demes that contain highly related pairs within: `geom_point(data = withinpairs, aes(x = longnum_p1, y = latnum_p1), color = "blue"`. Finally, we will add a connections between pairs across different demes from our highly related between pairs dataframe: `geom_curve(data = highbtwnpairs, aes(x = longnum_p1, y = latnum_p1, xend = longnum_p2, yend = latnum_p2, color = malecotf)`. Your plot contains both spatial and relatedness data in a easily communicated graph. Note, you can change the order of the layers in order to have either points or curves on top (remember, ggplot layers follow the order of the code). 
+_**Question de codage 21, partie 2**_ : Nous allons maintenant tracer ces trames de données. Créez d'abord une base de carte en utilisant la couche `geom_sf`. Ajoutez ensuite une couche pour les emplacements des clusters en utilisant `geom_point(data = mtdtclst, aes(x = longnum, y = latnum)`. Maintenant, nous allons colorier les dèmes qui contiennent des paires hautement liées dans: `geom_point(data = withinpairs, aes( x = longnum_p1, y = latnum_p1), color = "blue"`. Enfin, nous ajouterons une connexion entre les paires à travers différents dèmes à partir de notre cadre de données hautement lié entre les paires: `geom_curve(data = highbtwnpairs, aes(x = longnum_p1, y = latnum_p1, xend = longnum_p2, yend = latnum_p2, color = malecotf)". Votre graphique contient à la fois des données spatiales et de relation dans un graphique facilement communiqué. Notez que vous pouvez modifier l'ordre des couches afin d'avoir des points ou des courbes sur top (rappelez-vous, les couches ggplot suivent l'ordre du code).
+
 
 `r begin_button(21)`
 ```{r}
@@ -1001,10 +1003,10 @@ ggplot() +
 `r end_button()`
 `r hrule()`
 <br>
-_**Conceptual Question 15:** What can highly related pairs tell you? How do they relate to transmission events? Can you use them to estimate genetic corridors or evidence of gene flow? Do you think there is active transmission between the mainland and island (see original study hypothesis)?_
+_**Question conceptuelle 15:** Que peuvent vous dire les paires hautement apparentées? Comment sont-ils liés aux événements de transmission? Pouvez-vous les utiliser pour estimer les corridors génétiques ou les preuves de flux de gènes ? Pensez-vous qu'il y a une transmission active entre le continent et l'île (voir hypothèse d'étude originale)?_
 <br>
 `r begin_button(105)`
-_**Conceptual Answer 15:**_ Highly related pairs provide evidence of very recent transmission events. For example, meiotic siblings (IBD $geq$ 0.5) are expected to only be separated by a single generation (under certain assumptions: infinite population size, random breeding, etc). As a result, highly related pairs provide strong evidence of active corridors of gene flow. Thus, there is evidence that there is active transmission between the main and island! Further epidemiologic data would be needed to confirm our new suspicion that the mainland is the "source" that is seeding the island ("sink").  
+_**Réponse conceptuelle 15:**_ Les paires hautement liées fournissent la preuve d'événements de transmission très récents. Par exemple, les frères et sœurs méiotiques (IBD $geq$ 0,5) ne devraient être séparés que par une seule génération (sous certaines hypothèses: taille de population infinie, reproduction aléatoire, etc.). En conséquence, des paires hautement apparentées fournissent des preuves solides de couloirs actifs de flux de gènes. Ainsi, il est prouvé qu'il existe une transmission active entre le principal et l'île! D'autres données épidémiologiques seraient nécessaires pour confirmer notre nouveau soupçon que le continent est la "source" qui ensemence l'île ("puits").
 `r end_button()`
 `r hrule()`
 <br> 
