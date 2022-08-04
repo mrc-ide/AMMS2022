@@ -1,19 +1,23 @@
 ---
-title: "Pratique AMMS : Estimation de la structure de la population à partir des données de fréquence des allèles"
+title: 'Pratique AMMS : Estimation de la structure de la population à partir des données
+  de fréquence des allèles'
 author: "Izzy Routledge, Bob Verity, Nick Brazeau"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
-output: 
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
   html_document:
     theme: readable
     highlight: tango
     code_folding: show
     toc: yes
     toc_float:
-      collapsed: false
-      smooth_scroll: false
+      collapsed: no
+      smooth_scroll: no
     toc_depth: 2
-    number_sections: true
-editor_options: 
+    number_sections: yes
+editor_options:
   chunk_output_type: console
 ---
 
@@ -70,14 +74,14 @@ color: #004c93;
 Veuillez copier et coller le morceau de code ci-dessous dans son intégralité sur votre console pour télécharger les bibliothèques de packages R nécessaires à cette pratique. Si vous rencontrez des difficultés pour installer l'un des packages R, veuillez demander à un instructeur un lecteur flash préchargé.
 
 ```{r, echo=T}
-deps <- c("tidyverse", "genescaper", "MIPanalyzer","rmaverick")
+deps <- c("tidyverse", "genescaperlite", "MIPanalyzer","rmaverick")
 deps <- !sapply(deps, function(x){x %in% installed.packages()[,1]})
 if (any(deps)) {
   if (deps["tidyverse"]) {
     install.packages("tidyverse")
   }
   if (deps["genescaper"]) {
-    devtools::install_github("mrc-ide/genescaper", ref = "v0.1.0")
+    devtools::install_github("nickbrazeau/genescaperlite")
   }
   if (deps["MIPanalyzer"]) {
     devtools::install_github("mrc-ide/MIPanalyzer", ref = "v1.0.0")
@@ -93,7 +97,7 @@ Chargez maintenant toutes ces bibliothèques dans cette session en utilisant le 
 
 ```{r, echo=T}
 library(tidyverse)
-library(genescaper)
+library(genescaperlite)
 library(MIPanalyzer)
 library(rmaverick)
 ```

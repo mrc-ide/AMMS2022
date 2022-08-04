@@ -24,15 +24,15 @@ sim_freqs <- function(N = 1e3,
                       plot_expected_homo = FALSE) {
   
   # check inputs
-  genescaper:::assert_single_pos_int(N, zero_allowed = FALSE)
-  genescaper:::assert_single_pos_int(demes, zero_allowed = FALSE)
-  genescaper:::assert_single_bounded(mig_rate)
-  genescaper:::assert_single_bounded(mut_rate)
-  genescaper:::assert_single_pos_int(loci, zero_allowed = FALSE)
-  genescaper:::assert_vector_pos_int(t_out, zero_allowed = TRUE)
-  genescaper:::assert_logical(plot_on)
-  genescaper:::assert_logical(plot_homo)
-  genescaper:::assert_logical(plot_expected_homo)
+  genescaperlite:::assert_single_pos_int(N, zero_allowed = FALSE)
+  genescaperlite:::assert_single_pos_int(demes, zero_allowed = FALSE)
+  genescaperlite:::assert_single_bounded(mig_rate)
+  genescaperlite:::assert_single_bounded(mut_rate)
+  genescaperlite:::assert_single_pos_int(loci, zero_allowed = FALSE)
+  genescaperlite:::assert_vector_pos_int(t_out, zero_allowed = TRUE)
+  genescaperlite:::assert_logical(plot_on)
+  genescaperlite:::assert_logical(plot_homo)
+  genescaperlite:::assert_logical(plot_expected_homo)
   
   # define migration matrix
   mig_mat <- matrix(mig_rate / demes, demes, demes)
@@ -40,7 +40,7 @@ sim_freqs <- function(N = 1e3,
   diag(mig_mat) <- 1 - rowSums(mig_mat)
   
   # simulate from island model
-  sim1 <- quiet(genescaper::sim_wrightfisher(N = N,
+  sim1 <- quiet(genescaperlite::sim_wrightfisher(N = N,
                                              L = loci,
                                              alleles = 2,
                                              mu = mut_rate,
