@@ -22,29 +22,6 @@ knitr::opts_chunk$set(echo = T, warning = F, message = F,
                       fig.align = 'center', fig.keep = 'all')
 ```
 
-<!-- Here we style out button a little bit -->
-
-```{=html}
-<style>
-.showopt {
-background-color: #004c93;
-color: #FFFFFF; 
-width: 100px;
-height: 20px;
-text-align: center;
-vertical-align: middle !important;
-border-radius: 8px;
-float:right;
-}
-
-.showopt:hover {
-background-color: #dfe4f2;
-color: #004c93;
-}
-
-</style>
-```
-
 
 # Dependencies for Practical {-}
 
@@ -78,11 +55,11 @@ Very often in molecular surveillance we are interested in answering simple and w
 
 We could simply measure these quantities and report our results, which is sometimes called **descriptive statistics**, but often we want more than this. We want to be able to "prove" that an effect is real. This means accounting for the role of chance in our results through **statistical testing**, sometimes called **null hypothesis testing**. If our observed results are very unlikely to happen by chance alone then it gives us more confidence that an effect is real. This does not quite "prove" that the effect is real, as we could always have been very lucky or unlucky, but it does at least control how often we come to the wrong conclusion.
 
-Once we have a firm handle on statistical testing, the next crucial idea to grasp is **statistical power**. We can think of **power analysis** as a sort of statistical testing that we do before seeing any data. Instead, we make assumptions about the strength of the effect in the real world (for example, the difference in drug resistance prevalence) and  our sample size, and we calculate *exactly* how likely we are to detect this real effect with our chosen significance test. If power is low then we are likely to miss interesting results even if they are there, because our statistical test cannot rule out the possibility that our results are down to pure chance. It is therefore critically important that we carry out power analysis before undertaking any serious trial or survey to ensure that have a decent chance of success. 
+Once we have a firm handle on statistical testing, the next crucial idea to grasp is **statistical power**. We can think of **power analysis** as a sort of statistical testing that we do before seeing any data. Instead, we make assumptions about the strength of the effect in the real world (for example, the difference in drug resistance prevalence) and  our sample size, and we calculate *exactly* how likely we are to detect this real effect with our chosen significance test. If power is low then we are likely to miss interesting results even if they are there, because our statistical test cannot rule out the possibility that our results are down to pure chance. It is therefore critically important that we carry out power analysis before undertaking any serious trial or survey to ensure that we have a decent chance of success. 
 
 ### Overview of Data {-}
 
-For this practical we will work entirely with made-up datasets. These will allow us to get to grips with the basic concepts, which we can then apply to real datasets at a later stage.
+For this practical we will work entirely with made-up, or simulated, datasets. These will allow us to get to grips with the basic concepts, which we can then apply to real-world datasets at a later stage.
 
 ### Practical Goals {-}
 
@@ -135,12 +112,13 @@ We can see that we have only 10 samples from each population, and it's difficult
 # get mean and variance of control population
 mean(COI_control)
 var(COI_control)
+```
 
+```{r, results='hold', class.source = "fold-show"}
 # get mean and variance of bednets population
 mean(COI_nets)
 var(COI_nets)
 ```
-
 `r end_button()`
 `r hrule()`
 
@@ -171,7 +149,7 @@ SE_nets
 `r end_button()`
 `r hrule()`
 
-We can use the standard error to calculate a *95% confidence interval*. We would expect the population mean to lie inside this interval 95% of the time. Confidence intervals (CIs) are a useful way of visualising uncertainty in an estimate. The formula for a (normal) 95% CI is:
+We can use the standard error to calculate a *95% confidence interval*. The interpretation of a confidence interval under a frequentist definition can be confusing. It states that if we were to draw samples from the same population many times (or repeat this "experiment" many times), we would expect that 95% of our calculated confidence intervals would contain the population mean. A more straightforward interpretation is that we are _95% confident that our interval contains the population mean_. Confidence intervals (CIs) are a useful way of visualising uncertainty in an estimate. The formula for a (normal) 95% CI is:
 
 $\bar{x} \pm 1.96 \times SE$
 
@@ -209,7 +187,7 @@ We will compare the two means using the two-sample Student's t-test. We have the
 
 The formula for the test statistic is as follows:
 
-$t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\frac{\hat{s}_1^2 + \hat{s}_2^2}{n}}}$
+$t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\frac{\hat{s}^{2}_1 + \hat{s}^{2}_2}{n}}}$
 
 where $\bar{x}_1$ and $\bar{x}_2$ are the means of the two groups, $\hat{s}_1^2$ and $\hat{s}_2^2$ are the sample variances of the two groups, and $n$ is the sample size (the same in each group).
 
@@ -332,7 +310,7 @@ t_stat <- get_t_stat(COI_control, COI_nets)
 
 `r begin_button(9)`
 
-**A9.** p-value is around 0.37, which is greater than 0.05 so not significant at the 5% level. Based on this value, we would accept the null hypothesis that there is no difference between COI in the control and bednets populations.
+**A9.** p-value is around 0.37, which is greater than 0.05 so not significant at the 5% level. Based on this value, we cannot reject the null hypothesis that there is no difference between COI in the control and bednets populations.
 
 `r end_button()`
 `r hrule()`
@@ -354,11 +332,11 @@ Above, we used this formula for the t-test statistic:
 
 $t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\frac{\hat{s}_1^2 + \hat{s}_2^2}{n}}}$
 
-Let's rewrite this slightly. First, we will use $d$ to represent the difference between the mean COI in the two populations. It is this difference that we are interested in, and so this is often given the special name **effect size**. A larger effect size means there is a bigger difference between our populations, and so we are more likely to detect it. Second, we will use $s^2$ to represent the variance in COI in both populations. The new version of the formula becomes:
+Let's rewrite this slightly. First, we will use $d$ to represent the difference between the mean COI in the two populations. It is this difference that we are interested in - as it is the differene between our two study treatments, interventions, _etc._, and so this is often given the special name **effect size**. A larger effect size means there is a bigger difference between our populations, and so we are more likely to detect it. Second, we will use $s^2$ to represent the variance in COI in both populations (remember, we have assumed variance is the same in our two populations). The new version of the formula becomes:
 
 $t = \frac{d}{\sqrt{\frac{2s^2}{n}}}$
 
-The following block of code defines these parameters and then plots the distribution of the test statistic under the null and alternative hypotheses. The critical values of the distribution are shown as vertical dashed lines. Recall that the power is the proportion of the red distribution that lies outside of these lines.
+The following block of code defines these parameters and then plots the distribution of the test statistic under the null and alternative hypotheses. The critical values, or "cut off" points for our designated $\alpha$ value (level of significance), of the null distribution are shown as vertical dashed lines. Recall that the power is the proportion of the red distribution that lies outside of these lines.
 
 ```{r, out.width="60%"}
 # input parameters
@@ -476,7 +454,7 @@ qplot(x = d, y = get_pow_ttest(d, s, n, alpha)*100) + theme_bw() +
 `r hrule()`
 
 
-From the analysis above, we can see that the orginal study, which used a sample size of `n = 10`, had extremely low power. We were only powered to detect a significant difference between groups if there was a difference in average COI of more than 1.5, which is quite a large difference. On the other hand, if we wanted to detect differences of COI down to 0.5 then we would need a sample size closer to `n = 65`. Given these findings, it is not surprising that we got a non-significant result in the real data analysis. Unfortunately, this study was probably a waste of both time and money. It may have generated some interesting descriptive statistics, and the results can be used as pilot data when designing future studies, but in terms of answering the key scientific question it was doomed to failure from the outset. The hard truth is - not all studies are worth doing!
+From the analysis above, we can see that the orginal study, which used a sample size of `n = 10`, had extremely low power. We were only powered to detect a significant difference between groups if there was a difference in average COI of more than 1.5, which is quite a large difference. On the other hand, if we wanted to detect differences of COI down to 0.5 then we would need a sample size closer to `n = 65`. Given these findings, it is not surprising that we got a non-significant result in the real data analysis. Unfortunately, this study was probably a waste of both time and money. It may have generated some interesting descriptive statistics, and the results can be used as pilot data when designing future studies, but in terms of answering the key scientific question it was doomed to failure from the outset. _**The hard truth is - not all studies are worth doing!**_
 
 
 # Comparing DR mutation prevalence {-}
@@ -544,15 +522,16 @@ For our statistical test, we want to compare two values as in the COI example ab
 
 $Z = \frac{\hat{p}_1 - \hat{p}_2}{\sqrt{\frac{\hat{p}_1(1 - \hat{p}_1)}{n_1} + \frac{\hat{p}_2(1 - \hat{p}_2)}{n_2}}}$
 
-where $\hat{p}_1$ and $\hat{p}_2$ are the proportions in the two groups, and $n_1$ and $n_2$ are the sample sizes. The following code calculates this statistic:
+where $\hat{p}_1$ and $\hat{p}_2$ are the prevalences in the two groups and $n_1$ and $n_2$ are the sample sizes. $\bar{p}$ is the mean prevalence, calculated as $\bar{p} = \frac{n_1\hat{p}_1 + n_2\hat{p}_2}{n_1 + n_2}$ The following code calculates this statistic:
 
 ```{r}
 # get values from summary table
 n <- pfcrt_summary$n
 p <- pfcrt_summary$prev
+p_bar <- sum(n*p) / sum(n)
 
 # calculate Z statistic
-Z <- (p[1] - p[2]) / sqrt(p[1]*(1 - p[1]) / n[1] + p[2]*(1 - p[2]) / n[2])
+Z <- (p[1] - p[2]) / sqrt(p_bar*(1 - p_bar) * (1/n[1] + 1/n[2]))
 Z
 ```
 
@@ -584,15 +563,20 @@ We can calculate a p-value as follows:
 `r end_button()`
 `r hrule()`
 
+As with the t-test, there is an easier way of carrying out a two-proportion Z-test in R, we can use the `prop.test()` function. This carries out the same analysis we just did by hand above:
+
+```{r}
+prop.test(x = n*p, n = n, correct = FALSE)
+```
 
 
 ## Power analysis and sample size calculation {-}
 
 As before, we will conduct a power analysis to work out if this study was well designed. We will keep things simple by assuming the same number of samples in both years. We can rewrite the formula for the Z statistic as follows:
 
-$Z = \frac{p_1 - p_2}{\sqrt{\frac{p_1(1 - p_1)}{n} + \frac{p_2(1 - p_2)}{n}}}$
+$Z = \frac{p_1 - p_2}{\sqrt{\frac{2\bar{p}(1 - \bar{p})}{n}}}$
 
-where $n$ is now the sample size in both years (replacing $n_1$ and $n_2$ in the previous version). Also notice another small difference - the symbols are now missing their "hats" (i.e. $p_1$ instead of $\hat{p}_1$). This makes it clear that we are talking about hypothetical parameter values, and not real values calculated from observed data. It's a small difference, but it's the sort of thing statisticians care about because it avoids the possibility of any confusion!
+where $n$ is now the sample size in both years (replacing $n_1$ and $n_2$ in the previous version).
 
 The following code plots the distribution of the Z statistic under the null and alternative hypotheses, similar to what we did for the t-test example above. Experiment with different values and see how they affect the distributions.
 
@@ -604,15 +588,16 @@ n <- 800
 alpha <- 0.05
 
 # produce plot
-plot_ztest(p1, p2, n1 = n, n2 = n, alpha)
+plot_ztest(p1, p2, n, alpha)
 ```
 
 We can also write a function to calculate the power (the area of the red distribution that is beyond the dashed lines) exactly:
 
 ```{r}
 # function that returns the power given these parameters
-get_pow_ztest <- function(p1, p2, n1, n2 = n1, alpha = 0.05) {
-  alt_mean <- (p1 - p2) / sqrt(p1*(1 - p1) / n1 + p2*(1 - p2) / n2)
+get_pow_ztest <- function(p1, p2, n, alpha = 0.05) {
+  p_bar <- mean(c(p1, p2))
+  alt_mean <- (p1 - p2) / sqrt(2*p_bar*(1 - p_bar) / n)
   pnorm(qnorm(alpha / 2), mean = alt_mean) + pnorm(qnorm(1 - alpha / 2), mean = alt_mean, lower.tail = FALSE)
 }
 ```
@@ -630,10 +615,10 @@ Assume a sample size of `n = 1000` throughout.
 
 **A17.** Power is very high, more than 99.99% in all cases.
 ```{r, results='hold'}
-get_pow_ztest(p1 = 0.4, p2 = 0.8, n1 = 1000)
-get_pow_ztest(p1 = 0.3, p2 = 0.6, n1 = 1000)
-get_pow_ztest(p1 = 0.2, p2 = 0.4, n1 = 1000)
-get_pow_ztest(p1 = 0.3, p2 = 0.45, n1 = 1000)
+get_pow_ztest(p1 = 0.4, p2 = 0.8, n = 1000)
+get_pow_ztest(p1 = 0.3, p2 = 0.6, n = 1000)
+get_pow_ztest(p1 = 0.2, p2 = 0.4, n = 1000)
+get_pow_ztest(p1 = 0.3, p2 = 0.45, n = 1000)
 ```
 
 `r end_button()`
@@ -649,7 +634,7 @@ p2 <- 0.8
 n <- 5:500
 
 # plot power curve
-qplot(x = n, y = get_pow_ztest(p1, p2, n1 = n, alpha = alpha)*100) + theme_bw() +
+qplot(x = n, y = get_pow_ztest(p1, p2, n, alpha)*100) + theme_bw() +
   scale_y_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0, 0)) +
   xlab("Sample size") + ylab("Power (%)")
 ```
@@ -658,21 +643,22 @@ qplot(x = n, y = get_pow_ztest(p1, p2, n1 = n, alpha = alpha)*100) + theme_bw() 
 
 `r begin_button(18)`
 
-**A18.** Approximate sample sizes needed are 20, 40, 80 and 180 for the four scenarios.
+**A18.** Approximate sample sizes needed are 20, 40, 80 and 190 for the four scenarios.
 
 `r end_button()`
 `r hrule()`
 
 
-Sometimes it is possible to come up an exact formula for the sample size. In this case, the exact formula can be written:
+Sometimes it is possible to come up a formula for the sample size. In this case, the formula can be written:
 
-$n = (z_{\alpha/2} + z_\beta)^2\left[\frac{p_1(1 - p_1) + p_2(1 - p_2)}{(p_1 - p_2)^2}\right]$
+$n = (z_{\alpha/2} + z_\beta)^2 \frac{2\bar{p}(1 - \bar{p})}{(p_1 - p_2)^2}$
 
-where $z_{\alpha/2}$ is the critical value at a significance level $\alpha$ (two-tailed), which we have already noted is around 1.96. $z_\beta$ is a similar value, this time calculated from $\beta$ which is defined as 1 minus the desired power (in our case $\beta = 0.2$ for 80% power). The following function implements this formula to give the exact sample size needed for any given power:
+where $z_{\alpha/2}$ is the critical value at a significance level $\alpha$ (two-tailed), which we have already noted is around 1.96. $z_\beta$ is a similar value, this time calculated from $\beta$ which is defined as 1 minus the desired power (in our case $\beta = 0.2$ for 80% power). The following function implements this formula to give the sample size needed for any given power:
 
 ```{r}
 get_n_ztest <- function(p1, p2, alpha = 0.05, power = 0.8) {
-  (qnorm(1 - alpha / 2) + qnorm(power))^2 * (p1*(1 - p1) + p2*(1 - p2)) / (p1 - p2)^2
+  p_bar <- mean(c(p1, p2))
+  (qnorm(1 - alpha / 2) + qnorm(power))^2 * 2*p_bar*(1 - p_bar) / (p1 - p2)^2
 }
 ```
 
@@ -682,7 +668,7 @@ This formula will sometimes give non-integer values, in which case they should b
 
 `r begin_button(19)`
 
-**A19.** For the scenarios below, we get sample sizes of 20, 40, 79 and 183. We should take the largest of these forwards as our recommendation, as then we will have sufficient power for any of the scenarios.
+**A19.** For the scenarios below, we get sample sizes of 24, 44, 83 and 187. We should take the largest of these forwards as our recommendation, as then we will have sufficient power for any of the scenarios.
 ```{r, results='hold'}
 get_n_ztest(p1 = 0.4, p2 = 0.8, power = 0.8)
 get_n_ztest(p1 = 0.3, p2 = 0.6, power = 0.8)
@@ -698,13 +684,20 @@ get_n_ztest(p1 = 0.3, p2 = 0.44, power = 0.8)
 
 `r begin_button(20)`
 
-**A20.** The cost of the original study was 100,000 USD. With a sample size of 183 per year, the new cost goes down to 18,300 USD.
+**A20.** The cost of the original study was 100,000 USD. With a sample size of 187 per year, the new cost goes down to 18,700 USD.
 
 `r end_button()`
 `r hrule()`
 
 
 What we have seen here is an example of an over-powered study. While we may think there is no harm in collecting more samples, we should keep in mind that every study has costs and that funds might be better spent elsewhere. In this case, we found that a properly powered design was more than 5 times cheaper than the original study. The NMCP could have conducted the same study in 5 different parts of the country, or over multiple years, and still would have made a cost saving. So, while it's generally a good idea to be cautious when calculating sample sizes, opting for larger values where unsure, there are limits to this approach and it is possible to collect too many samples. Whatever the situation, conducting a formal power analysis **before** the study has been carried out is an excellent way of exploring these issues.
+
+One final thing to note is that the formulae used in this power calculation are only approximations. Generally, simulation or computational-based methods will provide more accurate results as they don't make these same approximations. The `get_pow_ztest_exact()` function below uses this approach to calculate power exactly, which can be compared against the `get_pow_ztest()` function used above. Can you find parameter combinations where they agree/disagree?
+
+```{r, results='hold'}
+get_pow_ztest(p1 = 0.2, p2 = 0.5, n = 20)
+get_pow_ztest_exact(p1 = 0.2, p2 = 0.5, n = 20)
+```
 
 
 # Dealing with dropout {-}
@@ -721,7 +714,7 @@ We need to account for dropout in our sample size calculations to ensure that we
 
 $n_{\text{adjusted}} = \frac{n_{\text{original}}}{1 - p_{\text{dropout}}}$
 
-where $n_{\text{original}}$ is the raw sample size that we get out of our power analysis, and $p_{\text{dropout}}$ is the proportion of dropout that expect for a particular reason. For example, if our original sample size is `n = 100` and we expect 20% dropout then we do $n_{\text{adjusted}} = 100 / (1 - 0.2) = 100 / 0.8 = 125$. So, we need 125 people to account for this much dropout. We can easily check this - if we have 125 people and 20% of them drop out then we lose 25 people, bringing us back down to 100.
+where $n_{\text{original}}$ is the raw sample size that we get out of our power analysis, and $p_{\text{dropout}}$ is the proportion of dropout that expect for a particular reason. For example, if our original sample size is `n = 100` and we expect 20% dropout then we do $n_{\text{adjusted}} = 100 / (1 - 0.2) = 100 / 0.8 = 125$. So, we need 125 people to account for this much dropout. We can easily check this: if we have 125 people and 20% of them drop out then we lose 25 people, bringing us back down to 100.
 
 **Q21.** A control programme wants to determine whether the frequency of *dhps* K540E mutations in their country is above 10%. If so, they plan on switching first line drugs away from Sulfadoxine-Pyrimethamine. They plan on replicating this study in 5 distinct regions throughout the country. A statistical sample size calculation has found that 220 samples will be needed to achieve the power they want. However, each of the 5 laboratories involved in processing the samples has different levels of experience, resulting in different rates of samples being lost. The estimated proportion of samples lost in each of the labs is as follows:
 
@@ -813,7 +806,7 @@ This formula only holds as long as $n_1 > (z_{\alpha/2} + z_\beta)^2 \frac{p_1(1
 You have been asked to:
 
 1. Estimate the prevalence of K540E mutations in 2001 from the pilot data.
-2. Write a new function to implement the formula above. You might find it useful to look at the `get_n_ztest()` function defined in the previous as a guide.
+2. Write a new function to implement the sample size formula above. You might find it useful to look at the `get_n_ztest()` function defined in the previous as a guide.
 3. Use your new function to perform sample size calculation in each location, assuming prevalence has doubled since the pilot study. Aim for 80% power.
 3. Adjust sample sizes to account for dropout.
 4. Calculate your total number of samples for the study. Is this within budget?

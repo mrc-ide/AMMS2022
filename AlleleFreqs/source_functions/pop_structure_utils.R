@@ -1,8 +1,18 @@
+#  ---------------------------------------
+#' @title shhh
+#' @description sinks calls to console that are outputted to RMD unnecessarily 
+quiet <- function(x) {
+  sink(tempfile())
+  on.exit(sink())
+  invisible(force(x))
+}
 
+#  ---------------------------------------
 popvar <- function(x) {
   mean((x - mean(x))^2)
 }
 
+#  ---------------------------------------
 sim_freqs <- function(N = 1e3,
                       demes = 1,
                       mig_rate = 0.01,
@@ -30,14 +40,15 @@ sim_freqs <- function(N = 1e3,
   diag(mig_mat) <- 1 - rowSums(mig_mat)
   
   # simulate from island model
-  sim1 <- sim_wrightfisher(N = N,
-                           L = loci,
-                           alleles = 2,
-                           mu = mut_rate,
-                           t_out = t_out,
-                           mig_mat = mig_mat,
-                           initial_method = 2,
-                           initial_params = rep(1e6, 2), silent = TRUE)
+  sim1 <- quiet(genescaper::sim_wrightfisher(N = N,
+                                             L = loci,
+                                             alleles = 2,
+                                             mu = mut_rate,
+                                             t_out = t_out,
+                                             mig_mat = mig_mat,
+                                             initial_method = 2,
+                                             initial_params = rep(1e6, 2),
+                                             silent = TRUE))
   
   # strip out unwated rows and columns, and calculate allele frequency
   ret <- sim1 %>%
@@ -77,6 +88,15 @@ sim_freqs <- function(N = 1e3,
       }
     }
     
+    # drop legend if single locus and deme
+    if ((demes == 1) & (loci == 1)) {
+      plot1 <- plot1 + guides(color = "none")
+      if (plot_homo) {
+        plot2 <- plot2 + guides(color = "none")
+      }
+    }
+    
+    # combine plots
     if (plot_homo) {
       plot_ret <- cowplot::plot_grid(plot1, plot2)
     } else {

@@ -1,0 +1,31 @@
+#' @title COI Coin Toss Conceptual Visualization
+#' @details for a given set of loci, plot results of binomial toss
+
+COIn_toss <- function(COI = 1, loci = 3) {
+  # assertions to do
+
+  # realizations
+  rt <- lapply(1:loci, function(x){rbinom(n = COI, size = 1, prob = 0.5)})
+  # out
+  dplyr::data_frame(rt) %>%
+    dplyr::mutate(loci = paste0("Loci_", 1:dplyr::n())) %>%
+    tidyr::unnest(., cols = "rt") %>%
+    dplyr::mutate(coin = case_when(rt == 0 ~ "H",
+                                   rt == 1 ~ "T")) %>%
+    dplyr::group_by(loci) %>%
+    dplyr::summarise(
+      coin_results = paste(coin, collapse = "")) %>%
+    dplyr::mutate(
+      GT = purrr::map_chr(coin_results, function(x) {
+        ifelse(paste(unique(as.vector(stringr::str_split(string = x, pattern = "", simplify = T))), collapse = "") == "H", "Ref",
+               ifelse(paste(unique(as.vector(stringr::str_split(string = x, pattern = "", simplify = T))), collapse = "") == "T", "Alt",
+                      "Het"))
+      })
+      ) %>%
+    dplyr::rename(Loci = loci,
+                  "Coin Results" = "coin_results",
+                  "Genotype Call" = "GT") %>%
+    dplyr::mutate(Locinum = as.numeric(stringr::str_split_fixed(Loci, "_", n = 2)[,2])) %>%
+    dplyr::arrange(Locinum) %>%
+    dplyr::select(-c("Locinum"))
+}
