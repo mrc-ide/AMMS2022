@@ -28,4 +28,5 @@ As above, please copy and paste each line of code below into your console. *Agai
 remotes::install_github("bobverity/rmaverick")
 remotes::install_github("OJWatson/hmmibdr")
 remotes::install_github("mrc-ide/MIPanalyzer")
+remotes::install_github("nickbrazeau/genescaperlite")
 ```
