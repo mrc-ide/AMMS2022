@@ -1,5 +1,5 @@
 ---
-title: "AMMS Power Analysis Practical - Clustered Designs" 
+title: "AMMS Practical: Power Analysis for Clustered Designs" 
 author: "Bob Verity"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output: 
@@ -24,6 +24,7 @@ knitr::opts_chunk$set(echo = T, warning = F, message = F,
 
 ```{r, echo=FALSE}
 # utility functions
+set.seed(1)
 
 #  ---------------------------------------
 # draw horizontal line using html
