@@ -162,16 +162,16 @@ Great work! Now let's get to the real genetic data!
 Let's start by importing single-nucleotide polymorphism (SNP) data for a set of 113 samples from the Democratic Republic of the Congo (DRC) and 97 samples from Vietnam (VN). These samples were collected and whole-genome sequenced as part of the Pf3k project ([Pf3k](https://www.malariagen.net/)); our goal will be to estimate both COI and Fws for each of them. 
 
 SNP data can be derived from a variety of technologies, including molecular barcodes, amplicons, or whole-genome sequencing (WGS) data. In this case, your instructors have extracted information about 96 SNPs from the Pf3k WGS data, ensuring they meet the following criterion:
- + biallelic
- + have an intermediate PLAF
- + spread far apart from each other in the genome
- + have a sequencing coverage that was within a normal range
+  + biallelic  
+  + have an intermediate PLAF  
+  + spread far apart from each other in the genome  
+  + have a sequencing coverage that was within a normal range  
 
 **Q6:** Recalling back to the lecture, why could each of the above selection criterion important for COI estimation with THEREALMcCOIL?
 
 `r begin_button(6)`
 
-**A6:** _THEREALMcCOIL assumes each SNP is bi-allelic in it's statistical model. An intermediate PLAF is more informative for COI inference, as very low or high PLAF values will only very rarely be heterozygous. THEREALMcCOIL assumes each SNP is unlinked, hence they should be spread far apart. Removing very high or low coverage sites is a good precaution against read mapping error._
+**A6:** _THEREALMcCOIL assumes each SNP is biallelic. An intermediate PLAF is more informative for COI inference, as very low or high PLAF values will only very rarely be heterozygous. THEREALMcCOIL assumes each SNP is unlinked, hence they should be spread far apart along the genome. Removing very high or low coverage sites is a good precaution against read mapping error._
 
 `r end_button()`
 
