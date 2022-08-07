@@ -1,0 +1,787 @@
+---
+title: "AMMS COI Practical"
+author: "Jason A Hendry"
+date: "05/08/2022"
+output: html_document
+---
+
+---
+title: "AMMS COI Practical"
+author: "Jason Hendry, Nick Brazeau"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    theme: readable
+    highlight: tango
+    code_folding: show
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+    toc_depth: 2
+    number_sections: yes
+  word_document:
+    toc: yes
+    toc_depth: '2'
+editor_options:
+  chunk_output_type: console
+---
+
+## Remerciements {.unnumbered}
+Sincères remerciements à Sophie Berube, Isobel Routledge, Rohan Arambepola et Amy Wesolowski pour leurs contributions et leurs documents pratiques antérieurs.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F, 
+                      fig.align = 'center', fig.keep = 'all')
+```
+
+
+
+## Dépendances pour la pratique {.unnumbered}
+Veuillez copier et coller le morceau de code ci-dessous dans son intégralité sur votre console pour télécharger les bibliothèques de packages R nécessaires à cette pratique. Si vous rencontrez des difficultés pour installer l'un des packages R, veuillez demander à un instructeur un lecteur flash préchargé.
+
+```{r, echo=T}
+deps <- c("tidyverse", "vcfR")
+deps <- !sapply(deps, function(x){x %in% installed.packages()[,1]} )
+if(any(deps)) {
+    install.packages(names(deps)[deps])
+}
+```
+
+
+## Installation THEREALMcCOIL {.unnumbered}
+Installez le package THEREALMcCOIL à partir du EPPIcenter GitHub (ou utilisez le dépôt pré-cloné : `AMMS/COI/THEREALMcCOIL/categorical_method`) :
+
+1. Dans votre terminal, naviguez jusqu'au répertoire pratique `cd AMMS2022/COI`
+2. Vos instructeurs ont déjà cloné le code dans le répertoire à l'aide de la commande `git clone https://github.com/EPPIcenter/THEREALMcCOIL.git`. Confirmez que le dossier `THEREALMcCOIL` est présent dans `AMMS2022/COI`.
+3. Ensuite, accédez au répertoire de la méthode catégorique : `cd THEREALMcCOIL/categorical_method`
+4. Terminez l'installation : `R CMD SHLIB McCOIL_categorical_code.c llfunction_het.c`
+
+Si cela échoue, veuillez demander à un instructeur une clé USB préchargée.
+
+Veuillez maintenant charger toutes ces bibliothèques dans cette session en utilisant le morceau de code ci-dessous. Veuillez le copier-coller dans son intégralité.
+
+
+
+```{r, echo=T}
+
+source("R/utils.R")
+library(tidyverse)
+library(vcfR)
+
+```
+
+Veuillez définir *votre* directeur de travail R afin que vous soyez dans le répertoire `AMMS/COI`. Si vous rencontrez des difficultés pour trouver ce chemin, vous pouvez utiliser la fonction "file.choose" pour vous aider à déterminer son emplacement. Pour déterminer quel est votre répertoire de travail actuel, vous pouvez exécuter la commande `getwd()`.
+
+
+# Introduction {.unnumbered}
+## Définitions utiles{.unnumbered}
+ + **Définition :** _Un locus est une position fixe sur un chromosome où se trouve un marqueur génétique particulier._
+  + **Définition :** _Un allèle est l'identité d'un locus génétique particulier ou d'une séquence héritée entre les parents et la progéniture._
+  + **Définition :** _Polymorphisme mononucléotidique (SNP). Les formes de variation génétique qui n'impliquent que des modifications d'un seul nucléotide dans le génome sont appelées *polymorphismes mononucléotidiques*. *Polymorphisme* est latin pour 'formes multiples' ; dans ce cas, cela signifie qu'à cette position, vous pouvez observer différents nucléotides dans différents échantillons._
+  + **Définition :** _Un allèle est considéré comme biallélique s'il n'a que deux états dans une population (c'est-à-dire qu'un SNP biallélique peut être A ou T dans la population)._
+  + **Définition :** _Les données de séquençage consistent en des séquences d'ADN obtenues à partir d'une réaction de séquençage d'ADN._
+  + **Définition :** _La complexité de l'infection (COI), ou de manière équivalente la multiplicité de l'infection, est une statistique à valeur entière donnant le nombre de clones de parasites du paludisme gébnétiquement distincts dans un échantillon individuel._
+  + **Définition :** _Une infection palustre monoclonale contient une souche de parasite, ou « génome » (COI = 1), tandis qu'une infection polyclonale contient plus d'une souche de parasite (COI > 1)._
+  + **Définition** : _Hétérozygotie ($H$). Pour un locus génétique donné, l'hétérozygotie est une mesure de la diversité génétique des échantillons d'une population._
+  
+## Examen rapide du COI{.unnumbered}
+La complexité de l'infection (également connue sous le nom de multiplicité de l'infection) est le nombre de clones de parasites distincts, ou de souches de parasites, qui se trouvent dans un échantillon individuel. S'il n'y a qu'un seul clone, on dit que l'hôte a une infection monoclonale. S'il y a plus d'un clone, l'échantillon est dit polyclonal.
+<br>
+Les infections polyclonales résultent de deux voies : (1) la surinfection et (2) la contre-transmission. La _superinfection_ se produit lorsqu'un individu est piqué par plusieurs moustiques, chacun portant des clones distincts. La _cotransmission_ se produit lorsqu'un seul moustique est porteur de plus d'un clone et pique et transmet simultanément plusieurs clones à l'individu.
+<br>
+Il existe plusieurs mois pour calculer le COI. Dans cette pratique, nous explorerons deux approches : THEREALMcCOIL, qui estime le COI en fonction du nombre de sites hétérozygotes sur un ensemble de polymorphismes mononucléotidiques (SNP) ; et Fws, une statistique pour évaluer la complexité génétique au sein d'un échantillon, par rapport à sa population d'origine.
+
+## Objectifs pratiques {.unnumbered}
+À la fin de cet exercice pratique, vous devriez être capable de faire ce qui suit :
+  + Charger un fichier Variant Call Format (VCF) dans R
+  + Extrayez-le et transformez-le, en préparation de l'estimation du COI
+  + Calculer *p*opulation-*l*evel *a*alternative allele *f*requencie*s* (PLAFs) pour un ensemble de SNP
+  + Exécutez THEREALMcCOIL à partir de R
+  + Calcul Fws
+
+Commençons!
+
+`r hrule()`
+
+# Un exemple de jouet : lancers de pièces et COI
+Avant d'aller plus loin, nous présenterons un exemple jouet pour illustrer comment le COI et le nombre de sites hétérozygotes sont liés.
+
+Considérons un seul SNP biallélique dans une infection de COI inconnu. Le processus par lequel ce SNP est hétérozygote ou homozygote peut être conceptualisé comme une série de lancers de pièces. En particulier, chaque souche dans l'infection apportera soit l'allèle de référence, soit l'allèle altératif ; chaque pile ou face dans une série contribue soit à pile soit à pile. Un SNP est hétérozygote s'il y a plus d'une souche présente (COI> 1), et la référence et l'alternative sont observées au moins une fois. Ceci est analogue à une série de lancers de pièces avec au moins une pile et une face.
+
+Vos instructeurs ont implémenté une petite fonction R "COIn_toss()" qui simule une série de lancers de pièces aléatoires et relie les résultats aux données SNP. Essayez d'exécuter ce `COIn_toss()` ci-dessous:
+
+```{r, eval=FALSE}
+COIn_toss(COI = 1, loci = 3)
+COIn_toss(COI = 2, loci = 3)
+COIn_toss(COI = 3, loci = 3)
+COIn_toss(COI = 4, loci = 3)
+COIn_toss(COI = 5, loci = 3)
+COIn_toss(COI = 6, loci = 3)
+```
+
+A l'aide de cette fonction, répondez aux questions suivantes :
+
+**Q1 :** Quelle est la relation entre le COI et le nombre de sites hétérozygotes ?
+
+`r begin_button(1)`
+
+**A1 :** _Plus le COI est élevé, plus on s'attend à des sites hétérozygotes ; ils sont positivement corrélés._
+
+`r end_button()`
+
+
+**Q2 :** Pourquoi est-il important que cette relation existe ?
+
+`r begin_button(2)`
+
+**A2 :** _Il est significatif que le COI et le nombre de sites hétérozygotes soient positivement corrélés, car cela nous donne un moyen de déduire le COI à partir des données génétiques. En particulier, si vous disposez de données génétiques provenant d'un échantillon de COI inconnu, vous pouvez examiner le nombre de sites hétérozygotes pour estimer le COI. En fait, c'est ce que THEREALMcCOIL fait._
+
+`r end_button()`
+
+
+**Q3 :** Les échantillons avec un COI>1 produisent-ils toujours des sites hétérozygotes ?
+
+`r begin_button(3)`
+
+**A3 :** _Non. Par chance, vous pouvez observer tous les allèles de référence ou tous les allèles alternatifs sur chaque site (c'est-à-dire tous les pile ou face pour chaque série de lancers de pièces)._
+
+`r end_button()`
+
+**Q4 :** Comment le fait d'avoir plus de SNP influence-t-il la probabilité d'observer un site hétérozygote ?
+
+`r begin_button(4)`
+
+**A4 :** _Pour les échantillons clonaux, cela n'a aucun effet. Pour les infections polyclonales, cela augmente la probabilité d'observer des SNP hétérozygotes. Cela réduit la probabilité qu'un échantillon COI> 1 contienne, par hasard, tous les sites homozygotes._
+
+`r end_button()`
+
+**Q5 :** Comment l'erreur de séquençage influencerait-elle le nombre de sites hétérozygotes ?
+
+`r begin_button(5)`
+
+**A5 :** _Si l'erreur de séquençage est aléatoire, cela augmentera faussement le nombre de sites hétérozygotes. Cela conduira à son tour à des surestimations du COI._
+
+`r end_button()`
+
+Bon travail! Passons maintenant aux vraies données génétiques !
+
+`r hrule()`
+
+
+# Charger et explorer un fichier VCF dans R
+## Contexte des données
+Commençons par importer des données de polymorphisme mononucléotidique (SNP) pour un ensemble de 113 échantillons de la République démocratique du Congo (RDC) et 97 échantillons du Vietnam (VN). Ces échantillons ont été collectés et le génome entier séquencé dans le cadre du projet Pf3k ([Pf3k](https://www.malariagen.net/)); notre objectif sera d'estimer à la fois le COI et le Fws pour chacun d'eux.
+
+Les données SNP peuvent être dérivées de diverses technologies, y compris les codes-barres moléculaires, les amplicons ou les données de séquençage du génome entier (WGS). Dans ce cas, vos instructeurs ont extrait des informations sur 96 SNP à partir des données Pf3k WGS, en s'assurant qu'ils répondent au critère suivant :
+  + biallélique
+  + avoir un PLAF intermédiaire
+  + répartis très éloignés les uns des autres dans le génome
+  + avoir une couverture de séquençage qui se situait dans une plage normale
+
+**Q6 :** Pour en revenir à la conférence, pourquoi chacun des critères de sélection ci-dessus pourrait-il être important pour l'estimation du COI avec THEREALMcCOIL ?
+
+`r begin_button(6)`
+
+**A6 :** _THEREALMcCOIL suppose que chaque SNP est biallélique. Un PLAF intermédiaire est plus informatif pour l'inférence COI, car des valeurs PLAF très faibles ou élevées ne seront que très rarement hétérozygotes. THEREALMcCOIL suppose que chaque SNP n'est pas lié, par conséquent, ils doivent être éloignés les uns des autres le long du génome. La suppression des sites à couverture très élevée ou faible est une bonne précaution contre les erreurs de mappage de lecture._
+
+`r end_button()`
+
+## Importation de données SNP dans R en tant que VCF
+Quelle que soit la technologie utilisée pour générer vos données SNP, elles seront presque toujours stockées dans un fichier Variant Call Format (VCF). En bref, ce format stocke les données SNP sous forme de tableau, où chaque ligne définit un SNP individuel. Les SNP sont définis par des informations obligatoires, telles que le chromosome sur lequel ils résident et leur position, les nucléotides de référence et alternatifs à cette position, etc. Pour plus de détails, vous pouvez consulter [Spécifications du format VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf).
+
+Ici, nous utiliserons le [package] `vcfR` (https://knausb.github.io/vcfR_documentation/) pour lire dans notre fichier d'appel de variantes (VCF) pour le DRC et le VN, respectivement.
+
+
+```{r}
+DRCongo <- vcfR::read.vcfR("data/SNPs.DRCongo.setA.random96.vcf")
+Vietnam <- vcfR::read.vcfR("data/SNPs.Vietnam.setD.random96.vcf")
+```
+
+## Contrôle qualité initial du VCF (CQ)
+Comme c'est toujours la bonne pratique, nous pouvons vérifier si notre VCF contient des données manquantes et confirmer qu'il contient le nombre de SNP et d'échantillons que nous attendons. Explorez les deux VCF chargés pour savoir si les données semblent raisonnables. Une façon de le faire est de tracer. Utilisez la fonction "extract.gt" du package vcfR pour extraire la profondeur d'allèle (premier enregistrement) de votre nouveau VCF. Tracez maintenant cette profondeur d'allèle en tant qu'exploration initiale des données à l'aide de la fonction `heatmap.bp` du package `vcfR`.
+
+#### RDC {.unnumbered}
+```{r}
+ad_drc <- vcfR::extract.gt(DRCongo, element = "AD", as.numeric = T)
+vcfR::heatmap.bp(ad_drc) 
+```
+
+#### VN {.unnumbered}
+```{r}
+ad_vn <- vcfR::extract.gt(Vietnam, element = "AD", as.numeric = T)
+vcfR::heatmap.bp(ad_vn) 
+```
+
+## Préparer les données dans un format ordonné
+Dans cette section, nous allons "munge" nos données VCF dans un format "propre" suivant les recommandations de la communauté R. Utilisez le package `vcfR` pour rendre les données VCF "longues" à partir de "larges", puis combinez les deux ensembles de données, en vous assurant d'avoir une nouvelle colonne qui indique si un échantillon provient de la RDC ou du VN. Pour ce faire, vous pouvez explorer la fonction `extract_gt_tidy`.
+
+```{r}
+# extract information
+loci <- DRCongo@fix[,1:2] %>% 
+  tibble::as_tibble() %>% 
+  dplyr::mutate(POS = as.numeric(POS),
+                Key = 1:dplyr::n()) %>% 
+  dplyr::select(c("CHROM", "POS", "Key"))
+
+# tidy up the DRC data to long format
+DRC_long <- DRCongo %>% 
+  vcfR::extract_gt_tidy() %>% 
+  dplyr::mutate(country = "DRC")
+
+# tidy up the VN data to long format
+VN_long <- Vietnam %>% 
+  vcfR::extract_gt_tidy() %>% 
+  dplyr::mutate(country = "VN")
+
+# combine the DRC and VN data into one long dataframe
+combined_long <- dplyr::bind_rows(DRC_long, VN_long) %>% 
+  # now lets merge the loci information with the individual level information
+  dplyr::full_join(x = loci, y = ., by  = "Key") %>% 
+  # don't need Key anymore
+  dplyr::select(-c("Key"))
+```
+
+Le package `vcfR` extrait les informations de génotype sous forme de caractères, de sorte que la référence homozygote est "0/0", l'hétérozygote est "0/1" et l'alternative homozygote est "1/1". Pour la plupart des analyses, nous souhaitons convertir ces valeurs de caractères en nombres. En particulier, nous voulons convertir "0/0" en 0, "0/1" en 0,5 et "1/1" en 1,0.
+
+**Q7 :** À l'aide du `tidyverse`, convertissez "0/0" en 0, "0/1" en 0,5, "1/1" en 1. Indice : la commande à explorer est `dplyr::case_when( )`.
+
+`r begin_button(7)`
+
+**A7 :**
+```{r}
+
+combined_long <- combined_long %>% 
+  # use `mutate()` to add a new column
+  dplyr::mutate(
+    gt = dplyr::case_when(gt_GT == "0/0" ~ 0,
+                          gt_GT == "0/1" ~ 0.5,
+                          gt_GT == "1/1" ~ 1)  # change `gt_GT` column to `gt`
+  )
+
+```
+
+`r end_button()`
+
+
+### Exploration des fréquences alléliques au niveau de la population (PLAF)
+Ensuite, nous examinerons les fréquences alléliques au niveau de la population (PLAF) entre la RDC et le VN. Les fréquences d'allèles au niveau de la population sont calculées à partir des appels de génotype entre les individus par locus. En particulier, ils peuvent être calculés avec la formule
+
+$$ PLAF = \frac{n_{alt}}{n_{ref} + n_{alt}}, $$
+
+où $n_{alt}$ et $n_{ref}$ sont respectivement le nombre d'allèles alternatifs et le nombre d'allèles de référence observés dans l'ensemble de la population.
+
+Dans le cas du paludisme, on ne connaît pas précisément le nombre d'allèles car on ne connaît pas le COI ! Au lieu de cela, nous supposerons un organisme diploïde (une hypothèse faite pour des raisons de commodité).
+
+**Q8 :** Calculer le PLAF moyen pour la RDC et le VN.
+
+`r begin_button(8)`
+
+**A8 :**
+
+```{r}
+
+plaf <- combined_long %>% 
+  dplyr::group_by(CHROM, POS, country) %>% 
+  dplyr::summarise(
+    # multiple by 2 to assume diploid genome
+    PLAF = sum(gt * 2, na.rm = T) / (2* sum(!is.na(gt))) 
+  )
+
+```
+
+`r end_button()`
+
+Visualisez la répartition du PLAF pour chaque pays.
+
+```{r}
+
+plaf %>% 
+  ggplot() +
+  geom_boxplot(aes(x = country, y = PLAF, color = country), outlier.shape = NA) +
+  geom_jitter(aes(x = country, y = PLAF, color = country),
+              alpha = 0.3, size = 0.5) +
+  ylim(0, 1) + 
+  theme_linedraw() +
+  theme(legend.position = "none") + 
+  labs(y = "PLAF", x = "Country")
+
+```
+
+**Q9 :** Quelle est la valeur PLAF minimale, moyenne et maximale pour chaque population ?
+
+`r begin_button(9)`
+
+**A9 :** _Les valeurs minimales et maximales sont de 0,1 et 0,9 pour chaque population. Les moyennes sont de 0,37 pour VN, et 0,34 pour la RDC._
+
+`r end_button()`
+
+**Q10 :** Ces deux ensembles de SNP sont-ils identiques ? Devraient-ils être les mêmes?
+
+`r begin_button(10)`
+
+**A10 :** _Non, les ensembles de SNP pour les deux populations sont différents. En effet, vos instructeurs ont échantillonné les SNP au hasard pour chaque population. Idéalement, lorsque vous comparez deux populations distinctes, les SNP que vous utilisez doivent être identiques._
+
+`r end_button()`
+
+### Explorer le nombre de sites hétérozygotes par échantillon
+
+Comme nous l'avons appris dans notre exemple jouet, le nombre de sites hétérozygotes dans un échantillon donné est lié au COI de cet échantillon. Calculer le nombre de sites hétérozygotes pour chaque échantillon.
+
+```{r}
+
+n_hets <- combined_long %>% 
+  dplyr::group_by(Indiv, country) %>% 
+  dplyr::summarise(
+    # multiple by 2 to assume diploid genome
+    n_sites = length(gt),
+    n_hets = sum(gt == 0.5, na.rm=T)
+  )
+
+```
+
+Visualisez le nombre de sites hétérozygotes pour chaque échantillon.
+
+```{r}
+
+n_hets %>% 
+  ggplot() +
+  geom_boxplot(aes(x = country, y = n_hets, color = country), outlier.shape = NA) +
+  geom_jitter(aes(x = country, y = n_hets, color = country),
+              alpha = 0.3,size = 0.5) +
+  theme_linedraw() +
+  theme(legend.position = "none") + 
+  labs(y = "No. Heterozygous SNPs", x = "Country") 
+
+```
+
+
+# Estimation du COI avec THEREALMcCOIL (RMCL)
+Dans cette section, nous allons créer des estimations de COI à l'aide de THEREALMcCOIL (RMCL). Pour plus de détails sur la méthode, veuillez prendre le temps de consulter [Github](https://github.com/EPPIcenter/THEREALMcCOIL/) et [manuscrit](https://www.ncbi.nlm.nih.gov/pmc /articles/PMC5300274/). Nous nous concentrerons sur la [_categorical_ method](https://github.com/EPPIcenter/THEREALMcCOIL/tree/master/categorical_method).
+
+## Reformatage des données pour RMCL
+Avant d'exécuter RMCL, nous devons effectuer un reformatage supplémentaire de nos données de génotype SNP. Le format requis par RMCL est décrit [ici] (https://github.com/EPPIcenter/THEREALMcCOIL/tree/master/categorical_method). Nous allons d'abord convertir notre long bloc de données `combiné_long` en un bloc de données large :
+
+
+```{r}
+# wide format 
+combined_RMCL <- combined_long %>% 
+  dplyr::mutate(loci = paste(CHROM, POS, sep = "|")) %>% 
+  dplyr::select(c("loci", "Indiv", "gt")) %>% 
+  # liftover missing for RMCL 
+  dplyr::mutate(gt = ifelse(is.na(gt), -1, gt)) %>% 
+  tidyr::pivot_wider(names_from = "Indiv",
+                     values_from = "gt")
+
+```
+
+Maintenant, séparez votre format large nouvellement formé en un format large pour DRC et VN, respectivement
+
+```{r}
+
+DRCsmpls <- colnames(DRCongo@gt)[2:ncol(DRCongo@gt)]
+VNsmpls <- colnames(Vietnam@gt)[2:ncol(Vietnam@gt)]
+DRC_RMCL <- combined_RMCL[,c("loci", DRCsmpls)]
+VN_RMCL <- combined_RMCL[,c("loci", VNsmpls)]
+
+```
+
+Maintenant, soulevez les valeurs et dans une matrice pour se conformer à l'entrée attendue de RMCL.
+
+**Q11** : Complétez le bloc de code ci-dessous (en remplissant *** avec votre propre code) pour convertir les données au format RMCL pour VN en utilisant le DRC comme exemple. 
+
+```
+# DRC 
+DRC_RMCLmat <- as.matrix(DRC_RMCL[2:ncol(as.matrix(DRC_RMCL))])
+rownames(DRC_RMCLmat) <- DRC_RMCL[["loci"]]
+DRC_RMCLmat <- t(DRC_RMCLmat)
+# VN
+VN_RMCLmat <- as.matrix(***)
+rownames(VN_RMCLmat) <- VN_RMCL[[***]]
+VN_RMCLmat <- t(***)
+```
+
+`r begin_button(11)`
+**A11**: 
+```{r}
+# make matrix and format for RMCL
+# DRC 
+DRC_RMCLmat <- as.matrix(DRC_RMCL[2:ncol(as.matrix(DRC_RMCL))])
+rownames(DRC_RMCLmat) <- DRC_RMCL[["loci"]]
+DRC_RMCLmat <- t(DRC_RMCLmat)
+# VN
+VN_RMCLmat <- as.matrix(VN_RMCL[2:ncol(as.matrix(VN_RMCL))])
+rownames(VN_RMCLmat) <- VN_RMCL[["loci"]]
+VN_RMCLmat <- t(VN_RMCLmat)
+```
+`r end_button()`
+
+## Exécution de RMCL
+Exécutez maintenant le RMCL en utilisant les paramètres par défaut fournis dans [Github](https://github.com/EPPIcenter/THEREALMcCOIL/) pour le DRC et le VN. Notez que vous devrez créer un répertoire de sortie pour les résultats où envoyer votre fichier de sortie. Pour plus de commodité, veuillez copier et coller le morceau de code ci-dessous dans votre console. 
+
+```{r}
+# Prepare output directory
+output_dir <- "results"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
+
+# Source code, move into correct working direcory
+orig_wd <- getwd()
+setwd("THEREALMcCOIL/categorical_method/")
+source("McCOIL_categorical.R")
+
+# DRC
+output_path <- file.path(output_dir, "output_DRC_COI")
+McCOIL_categorical(DRC_RMCLmat,
+                   maxCOI=25, threshold_ind=20,
+                   threshold_site=20,
+                   totalrun=1000, burnin=100, M0=15,
+                   e1=0.05, e2=0.05,
+                   err_method=3, 
+                   path=getwd(),
+                   output=file.path("..", "..", output_path) # Up from THEREALMcCOIL/categorical/
+)
+
+
+# VN
+output_path <- file.path(output_dir, "output_VN_COI")
+McCOIL_categorical(VN_RMCLmat,
+                   maxCOI=25, threshold_ind=20,
+                   threshold_site=20,
+                   totalrun=1000, burnin=100, M0=15,
+                   e1=0.05, e2=0.05,
+                   err_method=3, 
+                   path=getwd(),
+                   output=file.path("..", "..", output_path) # Up from THEREALMcCOIL/categorical/
+)
+
+# Return to our original working directory
+setwd(orig_wd)
+
+```
+
+Si vous voyez un message indiquant le temps qu'il a fallu pour exécuter RMCL... alors vous avez réussi à estimer le COI, félicitations !
+
+## Exploration des sorties RMCL
+Les sorties de THEREALMcCOIL sont écrites dans des fichiers de votre répertoire de sortie spécifique. Chargeons ces fichiers et explorons nos résultats.
+
+**Q12** : Complétez le bloc de code ci-dessous (en remplissant *** avec votre propre code) pour filtrer vos résultats THEREALMcCOIL sur les bits pertinents pour VN en utilisant le DRC comme exemple. Ensuite, combinez vos résultats en une seule grande base de données.
+
+```
+# Load summary data for DRC
+DRCongo_COI <- read.table("results/output_DRC_COI_summary.txt", sep="\t", header=TRUE) %>% 
+  # Subset to COI results
+  dplyr::filter(CorP == "C") %>%  # subset to COI information
+  # select to rows we care about
+  dplyr::select(-c("file", "CorP")) %>% 
+  dplyr::rename(Indiv = name)
+DRCongo_COI$country <- "DRC"
+
+# load summary data for VN 
+VN_COI <- read.table("results/output_VN_COI_summary.txt", sep="\t", header=TRUE) %>% 
+  dplyr::filter(***) %>% 
+  dplyr::select(***) %>% 
+  dplyr::rename(Indiv = ***)
+VN_COI$country <- "VN"
+
+combined_COI <- dplyr::bind_rows(DRCongo_COI, ***)
+```
+`r begin_button(12)`
+**A12:**
+```{r}
+
+# Load summary data for DRC
+DRCongo_COI <- read.table("results/output_DRC_COI_summary.txt", sep="\t", header=TRUE) %>% 
+  # Subset to COI results
+  dplyr::filter(CorP == "C") %>%  # subset to COI information
+  # select to rows we care about
+  dplyr::select(-c("file", "CorP")) %>% 
+  dplyr::rename(Indiv = name)
+DRCongo_COI$country <- "DRC"
+
+# load summary data for VN 
+VN_COI <- read.table("results/output_VN_COI_summary.txt", sep="\t", header=TRUE) %>% 
+  # Subset to COI results
+  dplyr::filter(CorP == "C") %>% 
+  # select to rows we care about
+  dplyr::select(-c("file", "CorP")) %>% 
+  dplyr::rename(Indiv = name)
+VN_COI$country <- "VN"
+
+# now merge results
+combined_COI <- dplyr::bind_rows(DRCongo_COI, VN_COI)
+
+```
+`r end_button()`
+<br>
+
+Visualisons les distributions COI pour DRC et VN en créant une boîte à moustaches opposant les deux distributions.
+
+**Q13** : Complétez le bloc de code ci-dessous (en remplissant *** avec votre propre code) pour créer une boîte à moustaches de vos résultats.
+
+```
+combined_COI %>% 
+  ggplot() +
+  geom_boxplot(***, outlier.shape = NA) +
+  geom_jitter(***, 
+              alpha = 0.3, size = 0.5, height=0.1) +
+  theme_linedraw() +
+  theme(legend.position = "none") + 
+  labs(y = "COI", x = "Country")
+```
+<br>
+`r begin_button(13)`
+
+
+**A13:**
+```{r}
+combined_COI %>% 
+  ggplot() +
+  geom_boxplot(aes(x = country, y = mean, color = country), outlier.shape = NA) +
+  geom_jitter(aes(x = country, y = mean, color = country), 
+              alpha = 0.3, size = 0.5, height=0.1) +
+  theme_linedraw() +
+  theme(legend.position = "none") + 
+  labs(y = "COI", x = "Country")
+
+```
+`r end_button()`
+
+**Q14 :** Y a-t-il des différences de COI entre les deux pays ? Si oui, pouvez-vous les expliquer ?
+
+`r begin_button(14)`
+
+**A14 :** _Oui, les estimations du COI sont généralement plus élevées en RDC qu'en VN. Cela pourrait s'expliquer par des différences d'intensité de transmission entre les deux pays._
+
+`r end_button()`
+
+**Q15 :** À l'aide des commandes `tidyverse` : `group_by` et `summarise`, calculez la fraction d'infections mixtes pour chaque pays.
+
+`r begin_button(15)`
+
+**A15 :**
+
+```{r}
+combined_COI %>% 
+  group_by(country) %>% 
+  summarise(frac_mixed = sum(mean > 1)/n())
+```
+
+`r end_button()`
+
+# Compute Fws
+Notre prochaine tâche sera de calculer Fws. De la conférence, nous avons appris que la statistique Fws décrit la quantité de diversité perdue dans un échantillon individuel, par rapport à sa population d'origine. Pour chaque SNP, il est calculé avec la formule suivante :
+
+$$ F_{ws} = 1- \frac{H_{wsaf}}{H_{plaf}}, $$
+où les termes $H$ font référence aux hétérozygoties :
+
+$$ H = 2p(1-p), $$
+
+où $p$ est une fréquence d'allèle altérée, soit calculée dans un échantillon ($H_{wsaf}$) soit dans une population ($H_{plaf}$).
+
+En faisant la moyenne des estimations Fws pour tous les SNP d'un échantillon, vous pouvez obtenir une estimation par échantillon.
+
+## Calculer WSAF
+Nous allons d'abord calculer les fréquences alléliques alternatives intra-échantillon (WSAF), ce qui nous permettra de calculer $H_{wsaf}$. Le WSAF pour un SNP est défini comme suit :
+
+$$ WSAF = \frac{\mbox{Nombre de lectures portant un allèle alternatif}}{\mbox{Nombre total de lectures chevauchant SNP}} $$
+Nous ajouterons les estimations WSAF sous forme de colonne à la trame de données « combined_long » produite ci-dessus.
+
+**Q16 :** Complétez le bloc de code ci-dessous pour calculer le WSAF par échantillon.
+
+```
+combined_long <- combined_long %>% 
+  dplyr::mutate(
+    rad = purrr::map_dbl(gt_AD, function(x){vcfR::masplit(
+      as.matrix(x), record = 1, sort = FALSE, decreasing = FALSE)}),
+    aad = purrr::map_dbl(gt_AD, function(x){vcfR::masplit(
+      as.matrix(x), record = 2, sort = FALSE, decreasing = FALSE)}),
+    wsaf = ***,
+    wsaf = ifelse(is.nan(wsaf), NA, wsaf) # occurs when 0/0
+  ) %>% 
+  dplyr::select(c("CHROM", "POS", "Indiv", "gt", "country", "wsaf")) 
+```
+
+`r begin_button(16)`
+
+**A16:**
+```{r}
+# extract GT information and get WSAF for every sample at each loci
+combined_long <- combined_long %>% 
+  # lets make some new variables
+  dplyr::mutate(
+    rad = purrr::map_dbl(gt_AD, function(x){vcfR::masplit(
+      as.matrix(x), record = 1, sort = FALSE, decreasing = FALSE)}),
+    # get alternate allele depth 
+    aad = purrr::map_dbl(gt_AD, function(x){vcfR::masplit(
+      as.matrix(x), record = 2, sort = FALSE, decreasing = FALSE)}),
+    # calculate within-sample reference allele freq
+    wsaf = aad/(rad + aad),
+    wsaf = ifelse(is.nan(wsaf), NA, wsaf) # occurs when 0/0
+  ) %>% 
+  # now let's select the variables that we want
+  dplyr::select(c("CHROM", "POS", "Indiv", "gt", "country", "wsaf")) 
+```
+`r end_button()`
+
+## Calculer l'hétérozygotie
+Nous allons maintenant calculer les hétérozygoties en utilisant nos valeurs PLAF et WSAF. Tout d'abord, nous allons implémenter la fonction d'hétérozygotie ci-dessus en tant que fonction R :
+
+```{r}
+
+calc_biallelic_heterozygosity <- function(p_alt) {
+  return (2 * p_alt * (1 - p_alt))
+}
+
+```
+
+Utilisons maintenant notre fonction pour calculer l'hétérozygotie à partir de notre PLAF:
+
+
+```{r}
+# calculate het for pop
+plaf <- plaf %>% 
+  dplyr::mutate(
+    het_plaf = purrr::map_dbl(PLAF, calc_biallelic_heterozygosity)
+  )
+```
+
+
+Ici, vous verrez que nous avons *une* valeur d'hétérozygotie pour *chacun* de nos sites.
+
+Maintenant, procédez au calcul de l'hétérozygotie en utilisant les valeurs WSAF.
+
+```{r}
+
+combined_long <- combined_long %>% 
+  # lets make some new variables
+  dplyr::mutate(
+    het_wsaf = calc_biallelic_heterozygosity(wsaf)
+  )
+
+```
+
+Dans ce cas, nous avons une valeur pour chaque échantillon par chaque site.
+
+Nous allons maintenant utiliser nos valeurs d'hétérozygotie pour calculer Fws !
+
+**Q17**: 
+
+```
+combined_long_fws <- dplyr::full_join(combined_long, plaf, by = c("CHROM", "POS", "country")) %>% 
+  dplyr::mutate(Fwsloci = het_wsaf / het_plaf) %>% 
+  dplyr::group_by(country, Indiv) %>% 
+  dplyr::summarise(
+    fws = mean( 1 - ***, na.rm = T)
+  )
+```
+<br>
+
+`r begin_button(17)`
+**A17:**
+
+```{r}
+
+# now calculate fws
+combined_long_fws <- dplyr::full_join(combined_long, plaf, by = c("CHROM", "POS", "country")) %>% 
+  dplyr::mutate(Fwsloci = het_wsaf / het_plaf) %>% 
+  dplyr::group_by(country, Indiv) %>% 
+  dplyr::summarise(
+    fws = mean( 1 - het_wsaf / het_plaf, na.rm = T)
+  )
+
+```
+`r end_button()`
+<br>
+
+Enfin, visualisez vos valeurs Fws :
+
+```{r}
+combined_long_fws %>% 
+ggplot() +
+  geom_histogram(aes(x=fws, y = (..count../sum(..count..))*100),
+                 color = "#000000", fill = "#d9d9d9") +
+  facet_wrap(~country) +
+  xlab("Fws") + ylab("Frequency (%)") +
+  theme_linedraw()
+
+```
+
+**Q18 :** Les Fws sont-ils conformes aux attentes ? Expliquer.
+
+`r begin_button(18)`
+
+**A18 :** _Ici, nous voyons que DRC a un Fws *inférieur* à VN. Encore une fois, cela serait attendu si l'intensité de transmission était plus élevée en RDC._
+
+`r end_button()`
+
+# Comparer différentes statistiques liées au COI
+Ci-dessous, nous produirons des graphiques comparant les différentes statistiques liées au COI que nous avons calculées ci-dessus. Pour ce faire, nous devons d'abord fusionner nos statistiques clés : Fws, COI et nombre de sites hétérozygotes.
+
+
+```{r}
+combined_long_fws_COI <- dplyr::left_join(combined_long_fws, 
+                                          combined_COI,
+                                          by = "Indiv") %>%
+                         dplyr::left_join(., n_hets, 
+                         by="Indiv")
+```
+
+Enfin, réalisons des tracés comparant ces différents paramètres.
+
+#### COI vs. Fws {.unnumbered}
+```{r}
+# Plot
+combined_long_fws_COI %>% 
+  dplyr::mutate(meanfact = factor(mean, levels = 1:10)) %>% 
+  ggplot() + 
+  geom_boxplot(aes(x = meanfact, y = fws, 
+                   group = meanfact, color = country)) + 
+  facet_wrap(~country) + 
+  labs(x = "COI", y = "Fws") +
+  theme_linedraw() +
+  theme(legend.position = "none") 
+
+```
+
+#### COI vs nombre de sites hétérozygotes {.unnumbered}
+**Q19 :** À l'aide du code ci-dessus, créez maintenant une boîte à moustaches pour le nombre de sites hétérozygotes par rapport à la complexité de l'infection. La figure résultante devrait ressembler au tracé ci-dessous :
+
+```{r, echo=F}
+combined_long_fws_COI %>% 
+  dplyr::mutate(meanfact = factor(mean, levels = 1:10)) %>% 
+  ggplot() + 
+  geom_boxplot(aes(x = meanfact, y = n_hets, 
+                   group = meanfact, color = country)) + 
+  facet_wrap(~country) + 
+  labs(x = "COI", y = "Number of Heterozygous Sites") +
+  theme_linedraw() +
+  theme(legend.position = "none") 
+```
+
+`r begin_button(19)`
+
+**A19:**
+```{r, eval=F}
+
+# Plot
+combined_long_fws_COI %>% 
+  dplyr::mutate(meanfact = factor(mean, levels = 1:4)) %>% 
+  ggplot() + 
+  geom_boxplot(aes(x = meanfact, y = n_hets, 
+                   group = meanfact, color = country)) + 
+  facet_wrap(~country) + 
+  labs(x = "COI", y = "Number of Heterozygous Sites") +
+  theme_linedraw() +
+  theme(legend.position = "none") 
+
+
+```
+`r end_button()`
+
+Bon travail. Vous avez chargé et exploré un VCF, calculé le nombre de sites hétérozygotes pour chaque échantillon, estimé le COI, calculé Fws -- et comparé tous les résultats. Nous vous laissons avec une question de réflexion :
+
+**Est-ce que toutes les relations ci-dessus ont un sens ?**
+
+Discutez avec un voisin ou l'un des moniteurs.
